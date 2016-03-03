@@ -1,3 +1,4 @@
+
 /*
  *
  *
@@ -133,8 +134,7 @@
 /* allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
 
-#define CONFIG_BAUDRATE		230400	
-//#define CONFIG_BAUDRATE		115200
+#define CONFIG_BAUDRATE		115200
 
 /***********************************************************
  * Command definition
@@ -198,9 +198,8 @@
 #endif
 
 #if defined(CONFIG_CMD_KGDB)
-#define CONFIG_KGDB_BAUDRATE	230400
 /* speed to run kgdb serial port */
-//#define CONFIG_KGDB_BAUDRATE	115200		/* speed to run kgdb serial port */
+#define CONFIG_KGDB_BAUDRATE	115200		/* speed to run kgdb serial port */
 /* what's this ? it's not used anywhere */
 #define CONFIG_KGDB_SER_INDEX	1		/* which serial port to use */
 #endif
