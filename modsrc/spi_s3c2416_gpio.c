@@ -32,8 +32,8 @@
 #define S3C2416_SPI_GPIO_CLK	S3C2410_GPE(13)
 
 #ifdef DEBUG
-#define DEBUG_NUM(a) 	printk(KERN_DEBUG "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
-#define DEBUG_INFO(fmt, args...) printk(KERN_DEBUG "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
+#define DEBUG_NUM(a) 	printk(KERN_ALERT "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
+#define DEBUG_INFO(fmt, args...) printk(KERN_ALERT "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
 #else
 #define DEBUG_LINE(a)
 #define DEBUG_INFO(fmt, args...)

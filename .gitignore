@@ -3,3 +3,5 @@
 *.mod*
 *.bin*
 *.symvers*
+sdcard
+upload
