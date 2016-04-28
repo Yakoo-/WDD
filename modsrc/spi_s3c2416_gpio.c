@@ -134,7 +134,6 @@ static int s3c2416_spi_setup(struct spi_device *spi)
     s3c2410_gpio_cfgpin(pin->clk,  S3C2410_GPIO_OUTPUT);
     
     s3c2410_gpio_setpin(pin->cs, 1);
-    s3c2410_gpio_setpin(pin->mosi, 0);
     s3c2410_gpio_setpin(pin->clk, 1);
     DEBUG_INFO("GPIO SPI CS  : GPL13");
     DEBUG_INFO("GPIO SPI MISO: GPE11");

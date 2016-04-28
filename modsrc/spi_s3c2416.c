@@ -37,8 +37,6 @@
 #define S3C2416_SPI_FBClkSEL	(0x2C)  //Feedback clock selecting register
 #define S3C2410_GPL13_SPISS0	(0x02 << 26)
 
-//#ifdef DEBUG
-//#undef DEBUG
 #ifdef DEBUG
 #define DEBUG_LINE(a) 	printk(KERN_DEBUG "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
 #define DEBUG_INFO(fmt, args...) printk(KERN_DEBUG "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)

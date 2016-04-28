@@ -366,18 +366,25 @@ static int __devinit spi_oled_probe(struct spi_device *spi)
     spi_oled_dev = spi;
 
     platdata = (int *)(spi->dev.platform_data);
-    spi_oled_res = *platdata;
-    spi_oled_dc  = *(platdata + 1);
+    if (platdata == NULL){
+	printk("ERROR: Failed to get platform data!\n");
+	return -1;
+    } else {
+	spi_oled_res = platdata[0];
+	spi_oled_dc  = platdata[1];
+    }
     s3c2410_gpio_cfgpin(spi_oled_res, S3C2410_GPIO_OUTPUT);
     s3c2410_gpio_cfgpin(spi_oled_dc,  S3C2410_GPIO_OUTPUT);
     s3c2410_gpio_setpin(spi_oled_res, 1);
+    s3c2410_gpio_setpin(spi_oled_dc, 1);
 
     ker_buf = kmalloc(4096, GFP_KERNEL);
     
     // regist a file operation
     major = register_chrdev(0, "oled", &oled_ops);
-    // make a device node
+    // make a device class 
     class = class_create(THIS_MODULE, "oled");
+    // make a device node
     device_create(class, NULL, MKDEV(major, 0), NULL, "oled");
 
     return 0;

@@ -55,8 +55,8 @@ static irqreturn_t button_interrupt(int irq, void *dev_id)
     }
     else
     {
-	s3c2410_gpio_setpin(buzzer_pin, 1);
 	key_values[button_irqs->number] = (button_irqs->number +1);
+	s3c2410_gpio_setpin(buzzer_pin, 1);
     }
     
     ev_press = 1;

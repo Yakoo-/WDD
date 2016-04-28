@@ -9,8 +9,6 @@
 #include <mach/regs-gpio.h>
 #include <asm/uaccess.h>
 #include <linux/miscdevice.h>
-//#include <asm/arch/regs-gpio.h>
-//#include <asm/hardware.h>
 
 #define	DEVICE_NAME	"led"
 #define LED_MAJOR	231
