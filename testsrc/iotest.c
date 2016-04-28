@@ -56,7 +56,7 @@ int main(int argc, char **argv){
 
     //clear the data buffer
 
-    ret = lseek(fd, address,SEEK_SET);
+    ret = lseek(fd, address, SEEK_SET);
     ret = write(fd, data, length);
     close(fd);
 

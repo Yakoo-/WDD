@@ -1,3 +1,5 @@
+#define DEBUG 1
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +23,14 @@
 #define uchar	    unsigned char
 #define ushort16    unsigned short
 #define ushort	    unsigned short
+
+#ifdef DEBUG
+#define DEBUG_LINE(a) 	printf("[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
+#define DEBUG_INFO(fmt, args...) printf("[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
+#else
+#define DEBUG_LINE(a)
+#define DEBUG_INFO(fmt, args...)
+#endif
 
 static int fd;
 
@@ -147,13 +157,15 @@ void OLED_P8x16Str(uchar8 ucIdxX, uchar8 ucIdxY, uchar8 ucDataStr[])
     return;
 }
 
-void Error(char * errinfo){
+void Error(char * errinfo)
+{
     printf("Deadly error occured, error info: %s.\n", errinfo);
     exit(1);
 }
 
 // the input char array must be end up with '\0'.
-int str2int(char *str){
+int str2int(char *str)
+{
     int result = 0;
     int index = 0;
     int unit = 0;
@@ -191,10 +203,12 @@ int main(int argc, char **argv)
     int light = 0;
     int i = 0;
 
+#ifdef DEBUG
     printf("argc: %d\n", argc);
     for (i=0; i<argc; i++){
 	printf("argv[%d]: %s\n", i, argv[i]);
     }
+#endif
     
     // check arguments
     if ((argc == 2) && !strcmp(argv[1], "init"))
@@ -257,8 +271,7 @@ int main(int argc, char **argv)
 	OLED_P8x16Str(col, row, str);
 	break;
     default:
-	printf("Invalid command!\n");
-	return -1;
+	Error("Invalid command!");
 	break;
     }
 

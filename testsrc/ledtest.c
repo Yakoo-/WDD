@@ -1,9 +1,3 @@
-/*************************************
-
-NAME:leds.c
-COPYRIGHT:www.embedsky.net
-
-*************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
