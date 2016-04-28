@@ -134,7 +134,7 @@
 /* allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
 
-#define CONFIG_BAUDRATE		115200
+#define CONFIG_BAUDRATE		460800
 
 /***********************************************************
  * Command definition
@@ -199,7 +199,7 @@
 
 #if defined(CONFIG_CMD_KGDB)
 /* speed to run kgdb serial port */
-#define CONFIG_KGDB_BAUDRATE	115200		/* speed to run kgdb serial port */
+#define CONFIG_KGDB_BAUDRATE	460800		/* speed to run kgdb serial port */
 /* what's this ? it's not used anywhere */
 #define CONFIG_KGDB_SER_INDEX	1		/* which serial port to use */
 #endif
@@ -226,7 +226,7 @@
 #define CFG_HZ			1562500
 
 /* valid baudrates */
-#define CFG_BAUDRATE_TABLE	{ 9600, 19200, 38400, 57600, 115200 }
+#define CFG_BAUDRATE_TABLE	{ 9600, 19200, 38400, 57600, 460800 }
 
 /*-----------------------------------------------------------------------
  * Stack sizes
@@ -364,8 +364,8 @@
 /* Boot configuration (define only one of next) */
 #define XP_TOOL
 //#define CONFIG_BOOT_NOR
-//define CONFIG_BOOT_NAND
-#define CONFIG_BOOT_MOVINAND
+#define CONFIG_BOOT_NAND
+//#define CONFIG_BOOT_MOVINAND
 //#define CONFIG_BOOT_ONENAND
 
 #define CONFIG_NAND
@@ -379,11 +379,11 @@
 #define CFG_NAND_LARGEPAGE_SAVEENV
 #define CONFIG_BOOTCOMMAND	"nand read.jffs2  32000000 100000 300000;bootm 32000000"
 //#define CONFIG_BOOTCOMMAND	"tftp 32000000 zImage;bootm 32000000"
-#define CONFIG_BOOTARGS    	"root=ubi0:rootfs rootfstype=ubifs console=ttySAC0,115200 ubi.mtd=2 init=/linuxrc"
+#define CONFIG_BOOTARGS    	"root=ubi0:rootfs rootfstype=ubifs console=ttySAC0,460800 ubi.mtd=2 init=/linuxrc"
 #elif defined(CONFIG_BOOT_MOVINAND)
 #define EPLL_VAL	(32<<16)|(3<<8)|(1<<0)
 #define CFG_ENV_IS_IN_MOVINAND
-#define CONFIG_BOOTARGS    	"root=/dev/ram rw  console=ttySAC0,115200 init=/linuxrc" 
+#define CONFIG_BOOTARGS    	"root=/dev/ram rw  console=ttySAC0,460800 init=/linuxrc" 
 //#define CONFIG_BOOTCOMMAND  "sleep 1;nand rescrub;sleep 1;movi read 3800000# 40000 c0000000 ;sleep 1;nand write c0000000 0 40000;sleep 1;movi read 3200000# 300000 32000000;sleep 1;nand write.jffs2 32000000 100000 300000;sleep 1;movi read 3500000# 300000 30800000;sleep 1;bootm 32000000 30800000"
 
 #define CONFIG_BOOTCOMMAND  "sleep 1;nand rescrub;sleep 1;movi read 3700000# 40000 c0000000 ;sleep 1;nand write c0000000 0 40000;sleep 1;movi read 3300000# 300000 32000000;sleep 1;nand write.jffs2 32000000 100000 300000;sleep 1;movi read 3500000# 300000 30800000;sleep 1;bootm 32000000 30800000"

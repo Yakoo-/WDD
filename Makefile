@@ -2,10 +2,12 @@ DIR_MOD  = ./modsrc
 DIR_TEST = ./testsrc
 DIR_OBJ = ./obj
 DIR_UPLOAD = ./upload
+DIR_ALGO = ./algorithmsrc
 
 all:
 	((cd ${DIR_MOD} && make) || exit 1;)
 	((cd ${DIR_TEST} && make) || exit 1;)
+	((cd ${DIR_ALGO} && make) || exit 1;)
 	cp -u ${DIR_MOD}/*.ko ${DIR_OBJ}
 	cp -u ${DIR_TEST}/*.o ${DIR_OBJ}
 	cp -u ${DIR_OBJ}/* ${DIR_UPLOAD}

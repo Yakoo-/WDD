@@ -296,16 +296,20 @@ static struct  i2c_board_info smdk2416_i2c_dev __initdata  = {
 	I2C_BOARD_INFO("wm8731",0x1a),
 };
 
-/*spi device for COM2416 */
+/* spi0 device, for OLED Screen */
+static int oled_pin[]={S3C2410_GPF(6), S3C2410_GPF(7)};
+
 static struct spi_board_info spi_info_com2416[] = {
-	{
-	 .modalias = "oled",
-	 .max_speed_hz = 10000000,
-	 .bus_num = 0
-	 .mode = SPI_MODE_0,
-	 .chip_select = 0,
-	}
-}
+    {
+	.modalias = "oled",
+	.max_speed_hz = 1000000,
+	.mode = SPI_MODE_0,
+	.bus_num = 0,
+	.chip_select = 0,    
+	.platform_data = (const void *)oled_pin , 
+    }
+};
+
 
 /* Touch srcreen */
 static struct resource s3c_ts_resource[] = {
@@ -441,8 +445,8 @@ static void __init smdk2416_machine_init(void)
 
 
 	i2c_register_board_info(0,&smdk2416_i2c_dev,1);
-	
-	spi_register_board_info(spi_info_com2416,ARRAY_SIZE(spi_info_com2416));
+
+	spi_register_board_info(spi_info_com2416, ARRAY_SIZE(spi_info_com2416));
 
 	platform_add_devices(smdk2416_devices, ARRAY_SIZE(smdk2416_devices));
 	smdk_machine_init();

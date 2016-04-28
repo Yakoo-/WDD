@@ -378,7 +378,7 @@ static void s3c_spi_set_cs(struct s3c2410_spi_info *spi, int cs, int pol)
 }
 
 static struct s3c2410_spi_info spi0_info = {
-    .num_cs  = 0xffff,
+    .num_cs  = 1,
     .bus_num = 0,
     .set_cs  = s3c_spi_set_cs,
 };
