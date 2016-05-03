@@ -6,3 +6,9 @@
 sdcard
 upload
 tags
+algorithmsrc
+fiq
+kernel_modify/Kconfig-spi
+kernel_modify/Makefile-spi
+python/
+

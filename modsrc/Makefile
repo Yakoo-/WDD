@@ -20,7 +20,7 @@ obj-m	+= spi_s3c2416.o
 obj-m	+= linearccd_fiq.o
 linearccd_fiq-objs	:= fiq_handler.o linearccd.o
 
-#obj-m	+= ccd_s3c2416_fiq.o
-#ccd_s3c2416_fiq-objs	:= fiq_handler.o fiqtest.o
+#obj-m	+= fiq_test.o
+#fiq_test-objs	:= fiq_handler.o fiqtest.o
 
 #obj-m	+= spi_s3c2440.o
