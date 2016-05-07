@@ -112,15 +112,6 @@ static int ccd_open(struct inode *inode, struct file *file)
 	goto err_claim;
     }
 
-    // setup fiq regs
-    regs.uregs[reg_args]  = (long)fiq_arg;
-    regs.uregs[reg_buffer]= (long)pixels_buffer;
-    regs.uregs[reg_tmpd]  = 0;
-    regs.uregs[reg_tmpa]  = 0;
-    regs.uregs[reg_index] = 0;
-    regs.uregs[reg_datain]= 0;
-
-    set_fiq_regs(&regs);
     set_fiq_handler(&codes->data, codes->length);
 
     irq_set_irq_type(IRQ_NUM, IRQF_TRIGGER_FALLING);
@@ -157,25 +148,32 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     // clear the buffer
     memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
 
+    // reset all fiq registers before each time we read data from ccd
+    regs.uregs[reg_args]  = (long)fiq_arg;
+    regs.uregs[reg_buffer]= (long)pixels_buffer;
+    regs.uregs[reg_tmpd]  = 0;
+    regs.uregs[reg_tmpa]  = 0;
+    regs.uregs[reg_index] = 0;
+    regs.uregs[reg_datain]= 0;
+    set_fiq_regs(&regs);
+ 
     // enable receive procedure
     fiq_arg->status = FIQ_STATUS_RUNNING;
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
-
-    msleep(1000);
-
+    msleep(500);
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
 
     if (fiq_arg->status != FIQ_STATUS_FINISHED){
 	// failed to receive data from linear ccd
-#ifdef DEBUG	
 	get_fiq_regs(&regs);
+#ifdef DEBUG	
 	DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
 	DEBUG_INFO("buffer: 0x%p", (unsigned int *)regs.uregs[reg_buffer]);
 	DEBUG_INFO("tempd : %d"  , (unsigned int  )regs.uregs[reg_tmpd]);
 	DEBUG_INFO("tempa : 0x%p", (unsigned int *)regs.uregs[reg_tmpa]);
 	DEBUG_INFO("index : 0x%p", (unsigned int *)regs.uregs[reg_index]);
 	DEBUG_INFO("datain: 0x%p", (unsigned int *)regs.uregs[reg_datain]);
-//	print_page(pixels_buffer);
+	print_page(pixels_buffer);
 #endif
 	memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
 	printk("Failed to receive image data, time out!\n");
