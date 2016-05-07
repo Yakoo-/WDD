@@ -23,10 +23,10 @@
 #define DEVICE_NAME	    "linear-ccd"
 
 #ifdef DEBUG
-#define DEBUG_LINE(a) 	printk(KERN_DEBUG "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
+#define DEBUG_NUM(a) 	printk(KERN_DEBUG "[%s:%d] "#a" = %d\r\n",__func__,__LINE__,a) 
 #define DEBUG_INFO(fmt, args...) printk(KERN_DEBUG "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
 #else
-#define DEBUG_LINE(a)
+#define DEBUG_NUM(a)
 #define DEBUG_INFO(fmt, args...)
 #endif
 
@@ -85,19 +85,25 @@ static struct fiq_handler ccd_s3c2416_fiq_fh = {
     .name   = "ccd_s3c2416_fiq_handler"
 };
 
+static void print_page(unsigned int *page)
+{
+    int col, row;
+
+    for (row = 0; row<128; row++){
+	printk("row%-3d:\t", row);
+	for (col = 0; col<8; col++){
+	    printk("0x%-4X\t", page[row*8 + col]);
+	}
+	printk("\n");
+    }
+}
+
 // config gpio and register irq 
 static int ccd_open(struct inode *inode, struct file *file)
 {
     int ret;
     struct pt_regs regs;
     struct fiq_code *codes = &ccd_s3c2416_fiq_handler;
-
-    // alloc 1 page (4KB) memory for pixels_buffer
-    pixels_buffer = (unsigned int *)get_zeroed_page(GFP_KERNEL);
-    if (pixels_buffer == NULL){
-	printk("Failed to alloc new page for pixels_buffer!\n");
-	goto err_buffer;
-    }
 
     // claim fiq
     ret = claim_fiq(&ccd_s3c2416_fiq_fh);
@@ -121,46 +127,56 @@ static int ccd_open(struct inode *inode, struct file *file)
     s3c24xx_set_fiq(IRQ_NUM, 1);
     enable_irq(IRQ_NUM);
 
-#ifdef DEBUG
-    DEBUG_INFO("fiq_arg->status: %d, fiq_arg->va_irq: 0x%p, fiq_arg->va_gpio: 0x%p", 
-	    fiq_arg->status, fiq_arg->va_irq, fiq_arg->va_gpio);
+    DEBUG_INFO("fiq_arg: 0x%p", fiq_arg);
+    DEBUG_INFO("buffer : 0x%p", pixels_buffer);
     DEBUG_INFO("S3C24XX_VA_IRQ: 0x%p", S3C24XX_VA_IRQ);
     DEBUG_INFO("S3C24XX_VA_GPIO: 0x%p", S3C24XX_VA_GPIO);
-#endif
 
     printk("FIQ codes inserted, code length: %d Bytes\n", codes->length);
     return 0;
 
 err_claim:
-    free_page((unsigned long)pixels_buffer);
-err_buffer:
     return -EINVAL;
 }
 
 static int ccd_close(struct inode *inode, struct file *file)
 {
-    disable_irq(IRQ_NUM);
-    s3c24xx_set_fiq(IRQ_NUM, 0);
     release_fiq(&ccd_s3c2416_fiq_fh);
-    free_page((unsigned long)pixels_buffer);
+    s3c24xx_set_fiq(IRQ_NUM, 0);
+    disable_irq(IRQ_NUM);
     return 0;
 }
 
 static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *offp)
 {
-    int timeout = 0, ret;
+    int ret;
+#ifdef DEBUG
+    struct pt_regs regs;
+#endif
+
+    // clear the buffer
+    memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
 
     // enable receive procedure
     fiq_arg->status = FIQ_STATUS_RUNNING;
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
 
-    while((fiq_arg->status != FIQ_STATUS_FINISHED) && (timeout < 10)){
-	msleep(100);
-	timeout++;
-    }
+    msleep(1000);
+
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
 
     if (fiq_arg->status != FIQ_STATUS_FINISHED){
-	// failed to receive data from linear ccd, clear all global registers
+	// failed to receive data from linear ccd
+#ifdef DEBUG	
+	get_fiq_regs(&regs);
+	DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
+	DEBUG_INFO("buffer: 0x%p", (unsigned int *)regs.uregs[reg_buffer]);
+	DEBUG_INFO("tempd : %d"  , (unsigned int  )regs.uregs[reg_tmpd]);
+	DEBUG_INFO("tempa : 0x%p", (unsigned int *)regs.uregs[reg_tmpa]);
+	DEBUG_INFO("index : 0x%p", (unsigned int *)regs.uregs[reg_index]);
+	DEBUG_INFO("datain: 0x%p", (unsigned int *)regs.uregs[reg_datain]);
+//	print_page(pixels_buffer);
+#endif
 	memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
 	printk("Failed to receive image data, time out!\n");
 	return -EBUSY;
@@ -171,7 +187,6 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
 
     // disable receive procedure
     fiq_arg->status = FIQ_STATUS_STOPPED;
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
 
     return ret ? -EFAULT : CCD_BUFFER_SIZE;
 }
@@ -188,7 +203,14 @@ static int __init ccd_init(void)
     int index = 0;
 
     printk(banner);
-    
+ 
+    // alloc 1 page (4KB) memory for pixels_buffer
+    pixels_buffer = (unsigned int *)get_zeroed_page(GFP_KERNEL);
+    if (pixels_buffer == NULL){
+	printk("Failed to alloc new page for pixels_buffer!\n");
+	goto err_buffer;
+    }
+   
     // initial fiq_args structure
     fiq_arg = (struct fiq_args *)kmalloc(sizeof(struct fiq_args), GFP_KERNEL);
     if (fiq_arg == NULL){
@@ -231,7 +253,7 @@ static int __init ccd_init(void)
     }
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
 #ifdef DEBUG
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_BUZZ].pin, 1);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_BUZZ].pin, 0);
 #endif
 
 
@@ -245,6 +267,8 @@ err_class :
 err_major :
     kfree(fiq_arg);
 err_arg :
+    free_page((unsigned long)pixels_buffer);
+err_buffer:
     return -EBUSY;
 }
 
@@ -254,6 +278,7 @@ static void __exit ccd_exit(void)
     class_destroy(ccd_class);
     unregister_chrdev(major, DEVICE_NAME);
     kfree(fiq_arg);
+    free_page((unsigned long)pixels_buffer);
 }
 
 module_init(ccd_init);

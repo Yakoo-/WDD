@@ -13,22 +13,23 @@
 static unsigned int pixels[CCD_MAX_PIXEL_CNT];
 static const unsigned int buffer_len = sizeof(pixels);
 
+static void print_page(unsigned int *page)
+{
+    int col, row;
+
+    for (row = 0; row<128; row++){
+	printf("row%-3d:\t", row);
+	for (col = 0; col<8; col++){
+	    printf("0x%-4X\t", page[row*8 + col]);
+	}
+	printf("\n");
+    }
+}
+
 void Error(char * errinfo)
 {
     printf("Deadly error occured, error info: %s.\n", errinfo);
     exit(1);
-}
-
-void print_array(unsigned int *array, unsigned int len)
-{
-    int index = 0;
-    printf("\t\t 0\t 1\t 2\t 3\t 4\t 5\t 6\t 7\t 8\t 9");
-    for (index=0; index<len; index++){
-	if (index % 10 == 0)
-	    printf("\n[%04d]",index / 10);
-	printf("%03X",array[index]);
-    }
-    printf("\n\n");
 }
 
 int main (void)
@@ -47,7 +48,7 @@ int main (void)
 	Error("Data read out is too short\n");
 
     printf("Data read out:\n");
-    print_array(pixels,CCD_MAX_PIXEL_CNT);
+    print_page(pixels);
 
     close(fd_ccd);
 

@@ -9,6 +9,26 @@
 #include <stdio.h>  
 #include <unistd.h>  
 
+int main()
+{
+    unsigned int a = 0;
+    unsigned int b = 0; 
+
+    b = a & 0xff;
+    if (b >= 10){
+	a = a >> 16;
+	a++;
+	if (a >= 1024){
+	    a = 0;
+	}else{
+	    a = a << 16;
+	}
+    }
+    return 0;
+}
+
+
+/*
 void ouch(int sig)  
 {  
     printf("\nOUCH! - I got signal %d\n", sig);  
@@ -28,7 +48,7 @@ int main()
     }  
     return 0;  
 }  
-
+*/
 /*
 void thread(void)
 {

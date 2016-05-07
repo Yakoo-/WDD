@@ -22,12 +22,15 @@ fiq_start:
     ldr	    reg_tmpa, [reg_args, # ARGS_VA_IRQ_OFFSET]
     str	    reg_tmpd, [reg_tmpa, # S3C2410_SRCPND - S3C24XX_VA_IRQ ]
 
-#ifdef DEBUG
+#if 0
     /* test code, change GPF0(BUZZER) */
     ldr	    reg_tmpa, [reg_args, # ARGS_VA_GPIO_OFFSET]
     ldr	    reg_tmpd, [reg_tmpa, # BUZ_GPXDAT_BASE - S3C24XX_VA_GPIO]
     eor	    reg_tmpd, reg_tmpd, # BUZ_PIN_MASK
     str	    reg_tmpd, [reg_tmpa, # BUZ_GPXDAT_BASE - S3C24XX_VA_GPIO]
+
+    add	    reg_index, reg_index, # 1;
+    add	    reg_datain, reg_datain, #1; 
 
     subs  pc, lr, # 4
 #endif
@@ -40,39 +43,38 @@ fiq_start:
     /* Test and save 1 bit pin value */
     ldr	    reg_tmpa, [reg_args, # ARGS_VA_GPIO_OFFSET]
     ldr	    reg_tmpd, [reg_tmpa, # DATA_GPXDAT_BASE - S3C24XX_VA_GPIO]
-    lsr	    reg_tmpd, # DATA_PIN_NUM
+    lsr	    reg_tmpd, reg_tmpd, # DATA_PIN_NUM
+    and	    reg_tmpd, reg_tmpd, # 1 
     orr	    reg_datain, reg_tmpd, reg_datain, lsl #1
 
     /* Bits flag +1 */
     add	    reg_index, reg_index, # 1
 
     /* Check if 1 pixel data has reveived */
-    lsl	    reg_tmpd, reg_index, # 16
-    lsr	    reg_tmpd, reg_tmpd, # 16
-    cmp	    reg_tmpd, # CCD_RES
+//    lsl	    reg_tmpd, reg_index, # 16
+//    lsr	    reg_tmpd, reg_tmpd, # 16
+    and	    reg_tmpd, reg_index, # 0xff
+    cmp	    reg_tmpd, # CCD_RES - 1
+    bls	    out;
 
     /* After 1 pixel data received, clear bit flag, storage datain to buffer and increase cell index */
-    lsrcs   reg_index, reg_index, # 16
-    strcs   reg_datain, [reg_buffer, reg_index, lsl #2]
-    addcs   reg_index, reg_index, # 1
+    lsr	    reg_index, reg_index, # 16
+    str	    reg_datain, [reg_buffer, reg_index, lsl #2]
+    mov	    reg_datain, # 0
+    add	    reg_index, reg_index, # 1
 
     /* If we are over the edge of the buffer, clear the write index,
      * bits flag and change the running status
      */
-    cmpcs   reg_index, # FIQ_BUFFER_LENGTH  
+    cmp   reg_index, # FIQ_BUFFER_LENGTH  
     movcs   reg_index, # 0
-    movcs   reg_datain, # 0
     movcs   reg_tmpd, # FIQ_STATUS_FINISHED
     strcs   reg_tmpd, [reg_args, # ARGS_STATUS_OFFSET]
 
-    /* disable fiq so that the next intrrupt will trigger IRQ */
-    movcs   reg_tmpd, # 0
-    ldrcs   reg_tmpa, [reg_args, # ARGS_VA_IRQ_OFFSET]
-    strcs   reg_tmpd, [reg_tmpa, # S3C2410_INTMOD - S3C24XX_VA_IRQ]
+    /* End of 1pixel recieve procedure */
+    lsl   reg_index, reg_index, # 16
 
-    /* End of 1bit recieve procedure */
-    lslls   reg_index, reg_index, # 16
-
+out:
     /*  return from FIQ */
     subs    pc, lr, # 4
 fiq_end:
