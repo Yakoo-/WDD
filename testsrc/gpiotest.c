@@ -5,9 +5,7 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 
-#define IOCTL_SET_CFG	1
-#define IOCTL_SET_PIN	2
-#define IOCTL_GET_PIN	3	
+#include "gpioctl.h"
 
 static int fd;
 static char *funcname;
@@ -120,7 +118,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    fd = open("/dev/gpioctl", O_RDWR);
+    fd = open(DEVICE_PATH, O_RDWR);
     if (fd < 0) {
 	Error("Failed to open /dev/gpioctl");
     }

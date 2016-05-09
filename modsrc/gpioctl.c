@@ -12,21 +12,9 @@
 #include <asm/uaccess.h>
 #include <linux/miscdevice.h>
 
-#define DEVICE_NAME	"gpioctl"
 
-#define IOCTL_SET_CFG	1
-#define IOCTL_SET_PIN	2
-#define IOCTL_GET_PIN	3	
-
-#ifdef DEBUG
-#define DEBUG_LINE(a) 	printk(KERN_INFO "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
-// do not end up with \n
-#define DEBUG_INFO(fmt, args...) printk(KERN_INFO "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
-#else
-#define DEBUG_LINE(a)
-#define DEBUG_INFO(fmt, args...)
-#endif
-
+#include "gpioctl.h"
+ 
 static int major;   // device major number is assigned by the system
 static struct class *gpio_class;
 static struct device *gpio_dev;
@@ -35,23 +23,41 @@ static int gpio_open(struct inode *inode, struct file *file)
 {
     return 0;
 }
-
+ 
 static long gpio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-    DEBUG_INFO("cmd: 0x%X, arg: %ld", cmd, arg);
+    int err = 0, ret = 0;
+    struct gpio_spec pin_spec;
+
+    if (_IOC_TYPE(cmd) != GPIO_IOC_MAGIC)
+	return - ENOTTY;
+    if (_IOC_NR(cmd) >= GPIO_IOC_MAXNR)
+	return - ENOTTY;
+
+    err = copy_from_user((void *)&pin_spec, (void __user *)arg, sizeof(struct gpio_spec));
+    if(err){
+	printk(KERN_ERR "Failed to copy data from user!");
+	return - EFAULT;
+    }
+    DEBUG_INFO("pin: %d, val: %d", pin_spec.pin, pin_spec.val);
+
     switch (cmd & 0x0f)
     {
 	case IOCTL_SET_CFG:
-	    s3c2410_gpio_cfgpin(arg, (cmd & 0xf0) >> 4);
-	    return 0;
+	    s3c2410_gpio_cfgpin(pin_spec.pin, pin_spec.val);
+	    break;
 	case IOCTL_SET_PIN:
-	    s3c2410_gpio_setpin(arg, (cmd & 0xf0) >> 4);
-	    return 0;
+	    s3c2410_gpio_setpin(pin_spec.pin, pin_spec.val);
+	    break;
 	case IOCTL_GET_PIN:
-	    return s3c2410_gpio_getpin(arg);
+	    pin_spec.val = s3c2410_gpio_getpin(pin_spec.pin);
+	    ret = 0;
+	    ret = copy_to_user((void __user *)arg, (void *)&pin_spec, sizeof(struct gpio_spec));
+	    break;
 	default:
-	    return -EINVAL;
+	    return - ENOTTY;
     }
+    return ret;
 }
 
 static struct file_operations gpio_fops=
