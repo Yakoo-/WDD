@@ -56,7 +56,7 @@ int main (void)
     printf("Test program for S10077 LINEAR CCD Driver\n");
 
     while (ret != buffer_len){
-	printf("Trying to get image data for the %d th time.\n", timeout + 1);
+	printf("\nTrying to get image data for the %d th time.\n", timeout + 1);
 	ret = read(fd_ccd, pixels, buffer_len);
 	DEBUG_NUM(ret);
 	timeout++;

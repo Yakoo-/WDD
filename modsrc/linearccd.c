@@ -30,6 +30,7 @@
 #define DEBUG_INFO(fmt, args...)
 #endif
 
+
 /* gpio configuration */ 
 struct gpio_desc {
     char *name;
@@ -108,8 +109,8 @@ static int ccd_open(struct inode *inode, struct file *file)
     // claim fiq
     ret = claim_fiq(&ccd_s3c2416_fiq_fh);
     if (ret){
-	printk("Failed to claim fiq!\n");
-	goto err_claim;
+        printk("Failed to claim fiq!\n");
+        goto err_claim;
     }
 
     set_fiq_handler(&codes->data, codes->length);
@@ -160,30 +161,33 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     // enable receive procedure
     fiq_arg->status = FIQ_STATUS_RUNNING;
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
-    msleep(500);
+    msleep(100);
+    // disable receive procedure
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
 
+    // check return value
+    get_fiq_regs(&regs);
+    DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
+    DEBUG_INFO("buffer: 0x%p", (unsigned int *)regs.uregs[reg_buffer]);
+    DEBUG_INFO("tempd : %d"  , (unsigned int  )regs.uregs[reg_tmpd]);
+    DEBUG_INFO("tempa : 0x%p", (unsigned int *)regs.uregs[reg_tmpa]);
+    DEBUG_INFO("index : 0x%p", (unsigned int *)regs.uregs[reg_index]);
+    DEBUG_INFO("datain: 0x%p", (unsigned int *)regs.uregs[reg_datain]);
+
     if (fiq_arg->status != FIQ_STATUS_FINISHED){
-	// failed to receive data from linear ccd
-	get_fiq_regs(&regs);
-#ifdef DEBUG	
-	DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
-	DEBUG_INFO("buffer: 0x%p", (unsigned int *)regs.uregs[reg_buffer]);
-	DEBUG_INFO("tempd : %d"  , (unsigned int  )regs.uregs[reg_tmpd]);
-	DEBUG_INFO("tempa : 0x%p", (unsigned int *)regs.uregs[reg_tmpa]);
-	DEBUG_INFO("index : 0x%p", (unsigned int *)regs.uregs[reg_index]);
-	DEBUG_INFO("datain: 0x%p", (unsigned int *)regs.uregs[reg_datain]);
-	print_page(pixels_buffer);
-#endif
-	memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
-	printk("Failed to receive image data, time out!\n");
-	return -EBUSY;
+        // failed to receive data from linear ccd
+        if (regs.uregs[reg_index] != 0x03ff0009){
+            memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
+            printk("Failed to receive image data, time out!\n");
+            return -EBUSY;
+        }
+        // we lost the last bit of ccd data, manually ignore this bit
+        pixels_buffer[CCD_MAX_PIXEL_CNT - 1] = regs.uregs[reg_datain] << 1;
+        DEBUG_INFO("We losted the last bit! Ignoring it!");
     }
 
     ret = copy_to_user(buff, pixels_buffer, CCD_BUFFER_SIZE);
     memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
-
-    // disable receive procedure
     fiq_arg->status = FIQ_STATUS_STOPPED;
 
     return ret ? -EFAULT : CCD_BUFFER_SIZE;
