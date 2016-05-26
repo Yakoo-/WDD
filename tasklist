@@ -1,11 +1,11 @@
 To Do:
 WDD-2, make a plastic shell
-WDD-3, display the ccd pixel data on oled screen
 WDD-4, set CCD_START(GPF5) signal to 1(negative enable) on system boot
 WDD-5, connect network pins of core board to net ports
 WDD-6, compile ssh, scp using arm-linux-gcc 
 
 In Progress:
-WDD-1, for commit b146fbc0b, bug still exist 
+WDD-3, display the ccd pixel data on oled screen
 
 Finished:
+WDD-1, for commit b146fbc0b, bug still exist 
