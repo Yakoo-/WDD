@@ -48,15 +48,12 @@ static irqreturn_t button_interrupt(int irq, void *dev_id)
     struct button_irq_desc *button_irqs = (struct button_irq_desc *)dev_id;
     int up = s3c2410_gpio_getpin(button_irqs->pin);
 
-    if (up)
-    {
-	key_values[button_irqs->number] = (button_irqs->number+ 1) + 0x80;
-	s3c2410_gpio_setpin(buzzer_pin, 0);
-    }
-    else
-    {
-	key_values[button_irqs->number] = (button_irqs->number +1);
-	s3c2410_gpio_setpin(buzzer_pin, 1);
+    if (up) {
+        key_values[button_irqs->number] = (button_irqs->number+ 1) + 0x80;
+        s3c2410_gpio_setpin(buzzer_pin, 0);
+    } else {
+        key_values[button_irqs->number] = (button_irqs->number +1);
+        s3c2410_gpio_setpin(buzzer_pin, 1);
     }
     
     ev_press = 1;
@@ -70,25 +67,22 @@ static int button_open(struct inode *inode, struct file *file)
     int i;
     int err;
 
-    for (i = 0;i < button_total;i++)
-    {
-	s3c2410_gpio_cfgpin(button_irqs[i].pin,button_irqs[i].pin_setting);
-	err = request_irq(button_irqs[i].irq, button_interrupt, IRQ_TYPE_EDGE_BOTH, button_irqs[i].name, (void *)&button_irqs[i]);
-	if (err)
-	    break;
+    for (i = 0;i < button_total;i++) {
+        s3c2410_gpio_cfgpin(button_irqs[i].pin,button_irqs[i].pin_setting);
+        err = request_irq(button_irqs[i].irq, button_interrupt, IRQ_TYPE_EDGE_BOTH, button_irqs[i].name, (void *)&button_irqs[i]);
+        if (err)
+            break;
     }
 
     s3c2410_gpio_cfgpin(buzzer_pin, buzzer_cfg);
     s3c2410_gpio_setpin(buzzer_pin, 0);
 
-    if (err)
-    {
-	for(i = 3;i >= 0;i--)
-	{
-	    disable_irq(button_irqs[i].irq);
-	    free_irq(button_irqs[i].irq, (void *)&button_irqs[i]);
-	}
-	return -EBUSY;
+    if (err) {
+        for(i = 3;i >= 0;i--) {
+            disable_irq(button_irqs[i].irq);
+            free_irq(button_irqs[i].irq, (void *)&button_irqs[i]);
+        }
+        return -EBUSY;
     }
 
     return 0;
@@ -98,10 +92,9 @@ static int button_close(struct inode *inode, struct file *file)
 {
     int i;
 
-    for(i = 0;i < button_total;i++)
-    {
-	disable_irq(button_irqs[i].irq);
-	free_irq(button_irqs[i].irq, (void *)&button_irqs[i]);
+    for(i = 0;i < button_total;i++) {
+        disable_irq(button_irqs[i].irq);
+        free_irq(button_irqs[i].irq, (void *)&button_irqs[i]);
     }
 
     return 0;
@@ -110,12 +103,11 @@ static int button_close(struct inode *inode, struct file *file)
 static int button_read(struct file *file, char __user *buff, size_t count, loff_t *offp)
 {
     unsigned long err;
-    if(!ev_press)
-    {
-	if(file->f_flags & O_NONBLOCK)
-	    return -EAGAIN;
-	else
-	    wait_event_interruptible(button_waitq, ev_press);
+    if(!ev_press) {
+        if(file->f_flags & O_NONBLOCK)
+            return -EAGAIN;
+        else
+            wait_event_interruptible(button_waitq, ev_press);
     }
 
     ev_press = 0;
@@ -129,9 +121,11 @@ static int button_read(struct file *file, char __user *buff, size_t count, loff_
 static unsigned int button_poll(struct file *file, struct poll_table_struct *wait)
 {
     unsigned int mask = 0;
+
     poll_wait(file, &button_waitq, wait);
     if(ev_press)
-	mask |= POLLIN | POLLRDNORM;
+        mask |= POLLIN | POLLRDNORM;
+
     return mask;
 }
 
@@ -153,17 +147,15 @@ static int __init button_init(void)
     printk(banner);
 
     ret = register_chrdev(BUTTON_MAJOR, DEVICE_NAME, &button_fops);
-    if (ret < 0)
-    {
-	printk(DEVICE_NAME "can't register major number\n");
-	return ret;
+    if (ret < 0) {
+        printk(DEVICE_NAME "can't register major number\n");
+        return ret;
     }
 
     button_class = class_create(THIS_MODULE, DEVICE_NAME);
-    if(IS_ERR(button_class))
-    {
-	printk("Err: failed to create button_class.\n");
-	return -1;
+    if(IS_ERR(button_class)) {
+        printk("Err: failed to create button_class.\n");
+        return -1;
     }
 
     device_create(button_class, NULL, MKDEV(BUTTON_MAJOR, 0), NULL, DEVICE_NAME);
