@@ -35,9 +35,6 @@ static struct button_irq_desc button_irqs[] =
     {IRQ_EINT11, S3C2410_GPG(3), S3C2410_GPG3_EINT11, 3, "KEY4"}
 };
 
-static unsigned long buzzer_pin = S3C2410_GPF(0);
-static unsigned int  buzzer_cfg = S3C2410_GPIO_OUTPUT;
-
 static unsigned int button_total = sizeof(button_irqs)/sizeof(button_irqs[0]);
 static volatile int key_values[] = {0,0,0,0};
 static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
@@ -50,10 +47,8 @@ static irqreturn_t button_interrupt(int irq, void *dev_id)
 
     if (up) {
         key_values[button_irqs->number] = (button_irqs->number+ 1) + 0x80;
-        s3c2410_gpio_setpin(buzzer_pin, 0);
     } else {
         key_values[button_irqs->number] = (button_irqs->number +1);
-        s3c2410_gpio_setpin(buzzer_pin, 1);
     }
     
     ev_press = 1;
@@ -73,9 +68,6 @@ static int button_open(struct inode *inode, struct file *file)
         if (err)
             break;
     }
-
-    s3c2410_gpio_cfgpin(buzzer_pin, buzzer_cfg);
-    s3c2410_gpio_setpin(buzzer_pin, 0);
 
     if (err) {
         for(i = 3;i >= 0;i--) {
