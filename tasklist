@@ -3,11 +3,14 @@ WDD-4, set CCD_START(GPF5) signal to 1(negative enable) on system boot
 WDD-5, connect network pins of core board to net ports
 WDD-6, compile ssh, scp using arm-linux-gcc 
 WDD-8, storage CCD data
+WDD-10, built a WIFI-to-UART interface board
+WDD-11, figuring out how to focusing our CCD sensor
 
 In Progress:
-WDD-2, make a plastic shell
 
 Finished:
 WDD-1, for commit b146fbc0b, bug still exist 
 WDD-3, display the ccd pixel data on oled screen
 WDD-7, new feture, run ccdtest when pressing a button
+WDD-2, make a plastic shell
+WDD-9, fix lithium battery inside the plastic shell
