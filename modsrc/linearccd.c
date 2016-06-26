@@ -40,25 +40,18 @@ struct gpio_desc {
     int pull;
 };
 
-#define INDEX_START	0
-#define INDEX_TRIGD	1
-
-#ifdef DEBUG
-#define INDEX_BUZZ	2
-#define INDEX_DATIN	3
-#define GPIO_CNT	4
-#else
-#define INDEX_DATIN	2
-#define GPIO_CNT	3
-#endif
+#define INDEX_START	    0
+#define INDEX_TRIGD	    1
+#define INDEX_DATIN	    2
+#define INDEX_LEDCT     3
+#define GPIO_CNT        4	
 
 static struct gpio_desc ccd_gpio[] = {
-    {"Start",  S3C2410_GPF(5), S3C2410_GPIO_OUTPUT, -1, 1},
-    {"TrigD",  S3C2410_GPF(3), S3C2410_GPF3_EINT3, IRQ_EINT3, -1},
-#ifdef DEBUG
-    {"Buzzer", S3C2410_GPF(0), S3C2410_GPIO_OUTPUT , -1, 0},
-#endif
-    {"DataIn", S3C2410_GPG(4), S3C2410_GPIO_INPUT , -1, 0}
+    {"Start",  S3C2410_GPF(5), S3C2410_GPIO_OUTPUT , -1, 1},
+    {"TrigD",  S3C2410_GPF(3), S3C2410_GPF3_EINT3  , IRQ_EINT3, -1},
+    {"DataIn", S3C2410_GPG(4), S3C2410_GPIO_INPUT  , -1, 0},
+    {"LEDCtr", S3C2410_GPE(15), S3C2410_GPIO_OUTPUT , -1, 0}
+
 };
 
 /* definitions for fiq handler */
@@ -86,24 +79,10 @@ static struct fiq_handler ccd_s3c2416_fiq_fh = {
     .name   = "ccd_s3c2416_fiq_handler"
 };
 
-static void print_page(unsigned int *page)
-{
-    int col, row;
-
-    for (row = 0; row<128; row++){
-	printk("row%-3d:\t", row);
-	for (col = 0; col<8; col++){
-	    printk("0x%-4X\t", page[row*8 + col]);
-	}
-	printk("\n");
-    }
-}
-
 // config gpio and register irq 
 static int ccd_open(struct inode *inode, struct file *file)
 {
     int ret;
-    struct pt_regs regs;
     struct fiq_code *codes = &ccd_s3c2416_fiq_handler;
 
     // claim fiq
@@ -160,10 +139,13 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
  
     // enable receive procedure
     fiq_arg->status = FIQ_STATUS_RUNNING;
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
-    msleep(100);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 1);  // light led
+    msleep(10);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);  // ccd start
+    msleep(100);    // wait for data ready
     // disable receive procedure
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 0);
 
     // check return value
     get_fiq_regs(&regs);
@@ -246,18 +228,13 @@ static int __init ccd_init(void)
 
     // initial gpio configuration
     for (index=0; index<GPIO_CNT; index++) {
-	s3c2410_gpio_cfgpin(ccd_gpio[index].pin, ccd_gpio[index].pin_cfg);
+        s3c2410_gpio_cfgpin(ccd_gpio[index].pin, ccd_gpio[index].pin_cfg);
 #if 0
-	if (ccd_gpio[index].pull >= 0)
-	    s3c2410_gpio_pullup(ccd_gpio[index].pin,
-				ccd_gpio[index].pull);
+        if (ccd_gpio[index].pull >= 0)
+            s3c2410_gpio_pullup(ccd_gpio[index].pin, ccd_gpio[index].pull);
 #endif
     }
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
-#ifdef DEBUG
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_BUZZ].pin, 0);
-#endif
-
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);  // ccd stop
 
     printk(DEVICE_NAME " initialized.\n\n");
     return 0;
