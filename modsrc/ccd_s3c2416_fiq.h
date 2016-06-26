@@ -9,12 +9,15 @@
  * CCD resolution = 10
  * Datain pin = GPG4
  */
-#define CCD_RES             10
-#define CCD_MAX_PIXEL_CNT   1024
-#define CCD_BUFFER_SIZE     FIQ_BUFFER_SIZE
-#define CCD_RES_MASK        0x3ff    // 10bit
-// start pulse low time is 3 pixel cycles, about 34+12*3=70 clock cycles of CCD,refer to S10077 USER MANUAL
-#define CCD_START_TLP       3
+#define CCD_RES                 10
+#define CCD_MAX_PIXEL_CNT       1024
+#define CCD_BUFFER_LENGTH       CCD_MAX_PIXEL_CNT
+#define CCD_BUFFER_CELL_SIZE    (sizeof(unsigned int))
+#define CCD_BUFFER_SIZE         (CCD_BUFFER_CELL_SIZE * CCD_BUFFER_LENGTH)
+#define CCD_RES_MASK            0x3ff    // 10bit
+/* start pulse low time = (34 + 12 * CCD_START_TLP) / F */
+/* currently F = 1Mhz */
+#define CCD_START_TLP           (30 << 4)
 
 #define DATA_GPIO_BANK      GPG
 #define DATA_PIN_NUM        4
@@ -26,10 +29,10 @@
 #define START_PIN_MASK      (1 << START_PIN_NUM)
 #define START_GPXDAT_BASE   S3C2410_GPFDAT
 
-#define LED_GPIO_BANK       GPB
-#define LED_PIN_NUM         3
+#define LED_GPIO_BANK       GPE
+#define LED_PIN_NUM         15
 #define LED_PIN_MASK        (1 << START_PIN_NUM)
-#define LED_GPXDAT_BASE     S3C2410_GPFDAT
+#define LED_GPXDAT_BASE     S3C2410_GPEDAT
 
 #ifdef DEBUG
 #define BUZ_GPIO_BANK       GPF
@@ -41,8 +44,7 @@
 #define IRQ_NUM                 IRQ_EINT3
 #define FIQ_ACK_BIT             (1 << (IRQ_NUM - IRQ_EINT0))
 #define FIQ_BUFFER_LENGTH       CCD_MAX_PIXEL_CNT
-#define FIQ_BUFFER_CELL_SIZE    (sizeof(unsigned int))
-#define FIQ_BUFFER_SIZE         (FIQ_BUFFER_CELL_SIZE * FIQ_BUFFER_LENGTH)
+#define FIQ_BUFFER_SIZE         CCD_BUFFER_SIZE
 
 #define FIQ_STATUS_STOPPED      0
 #define FIQ_STATUS_RUNNING      1

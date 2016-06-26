@@ -20,10 +20,10 @@
 
 #include "ccd_s3c2416_fiq.h"
 
-#define DEVICE_NAME	    "linear-ccd"
+#define DEVICE_NAME     "linear-ccd"
 
 #ifdef DEBUG
-#define DEBUG_NUM(a) 	printk(KERN_DEBUG "[%s:%d] "#a" = %d\r\n",__func__,__LINE__,a) 
+#define DEBUG_NUM(a)    printk(KERN_DEBUG "[%s:%d] "#a" = %d\r\n",__func__,__LINE__,a)
 #define DEBUG_INFO(fmt, args...) printk(KERN_DEBUG "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
 #else
 #define DEBUG_NUM(a)
@@ -31,7 +31,7 @@
 #endif
 
 
-/* gpio configuration */ 
+/* gpio configuration */
 struct gpio_desc {
     char *name;
     int pin;
@@ -40,11 +40,11 @@ struct gpio_desc {
     int pull;
 };
 
-#define INDEX_START	    0
-#define INDEX_TRIGD	    1
-#define INDEX_DATIN	    2
+#define INDEX_START     0
+#define INDEX_TRIGD     1
+#define INDEX_DATIN     2
 #define INDEX_LEDCT     3
-#define GPIO_CNT        4	
+#define GPIO_CNT        4
 
 static struct gpio_desc ccd_gpio[] = {
     {"Start",  S3C2410_GPF(5), S3C2410_GPIO_OUTPUT , -1, 1},
@@ -79,7 +79,7 @@ static struct fiq_handler ccd_s3c2416_fiq_fh = {
     .name   = "ccd_s3c2416_fiq_handler"
 };
 
-// config gpio and register irq 
+// config gpio and register irq
 static int ccd_open(struct inode *inode, struct file *file)
 {
     int ret;
@@ -118,17 +118,16 @@ static int ccd_close(struct inode *inode, struct file *file)
     return 0;
 }
 
-static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *offp)
+static void reset_fiq_regs(void)
 {
-    int ret;
-#ifdef DEBUG
     struct pt_regs regs;
-#endif
 
-    // clear the buffer
+    fiq_arg->status = FIQ_STATUS_STOPPED;
+
+    /* clear the buffer */
     memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
 
-    // reset all fiq registers before each time we read data from ccd
+    /* reset all fiq registers before we read data from ccd */
     regs.uregs[reg_args]  = (long)fiq_arg;
     regs.uregs[reg_buffer]= (long)pixels_buffer;
     regs.uregs[reg_tmpd]  = 0;
@@ -136,18 +135,35 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     regs.uregs[reg_index] = 0;
     regs.uregs[reg_datain]= 0;
     set_fiq_regs(&regs);
- 
-    // enable receive procedure
+}
+
+static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *offp)
+{
+    int ret;
+    struct pt_regs regs;
+
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 1);
+
+    /* Signal charge integration time is positive associate to */
+    /* the High-to-Low ratio of START pulses. */
+    /* We need to read 1 frame data first to adjust that ratio. */
+    reset_fiq_regs();
     fiq_arg->status = FIQ_STATUS_RUNNING;
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 1);  // light led
-    msleep(10);
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);  // ccd start
-    msleep(100);    // wait for data ready
-    // disable receive procedure
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
+
+    /* reference to S10077 datasheet */
+    /* START pulse interval >= 1/1Mhz * 12339 = 12.3ms */
+    msleep(13);
+    /* START pin should have been pulled up in fiq driver */
+
+    /* enable valid receiving procedure */
+    reset_fiq_regs();
+    fiq_arg->status = FIQ_STATUS_RUNNING;
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
+    msleep(13);
+
     s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 0);
 
-    // check return value
     get_fiq_regs(&regs);
     DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
     DEBUG_INFO("buffer: 0x%p", (unsigned int *)regs.uregs[reg_buffer]);
@@ -157,13 +173,13 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     DEBUG_INFO("datain: 0x%p", (unsigned int *)regs.uregs[reg_datain]);
 
     if (fiq_arg->status != FIQ_STATUS_FINISHED){
-        // failed to receive data from linear ccd
         if (regs.uregs[reg_index] != 0x03ff0009){
             memset(pixels_buffer, 0, CCD_BUFFER_SIZE);
             printk("Failed to receive image data, time out!\n");
             return -EBUSY;
         }
-        // we lost the last bit of ccd data, manually ignore this bit
+        /* Occasionally we lost the last bit of ccd data, */
+        /* Manually ignore this bit when that occasion occurs. */
         pixels_buffer[CCD_MAX_PIXEL_CNT - 1] = regs.uregs[reg_datain] << 1;
         DEBUG_INFO("We losted the last bit! Ignoring it!");
     }
@@ -187,19 +203,19 @@ static int __init ccd_init(void)
     int index = 0;
 
     printk(banner);
- 
+
     // alloc 1 page (4KB) memory for pixels_buffer
     pixels_buffer = (unsigned int *)get_zeroed_page(GFP_KERNEL);
     if (pixels_buffer == NULL){
-	printk("Failed to alloc new page for pixels_buffer!\n");
-	goto err_buffer;
+        printk("Failed to alloc new page for pixels_buffer!\n");
+        goto err_buffer;
     }
-   
+
     // initial fiq_args structure
     fiq_arg = (struct fiq_args *)kmalloc(sizeof(struct fiq_args), GFP_KERNEL);
     if (fiq_arg == NULL){
-	printk("Failed to alloc memory for fiq_arg!\n");
-	goto err_arg;
+        printk("Failed to alloc memory for fiq_arg!\n");
+        goto err_arg;
     }
     fiq_arg->status = FIQ_STATUS_STOPPED;
     fiq_arg->va_irq  = S3C24XX_VA_IRQ;
@@ -208,22 +224,22 @@ static int __init ccd_init(void)
     // regist a file operation
     major = register_chrdev(0,DEVICE_NAME,&ccd_fops);
     if (major < 0) {
-	printk("can't register major number!\n");
-	goto err_major;
+        printk("can't register major number!\n");
+        goto err_major;
     }
 
     // make a device class
     ccd_class = class_create(THIS_MODULE,DEVICE_NAME);
     if (IS_ERR(ccd_class)){
-	printk("Error: failed to create ccd_class! \n");
-	goto err_class;
+        printk("Error: failed to create ccd_class! \n");
+        goto err_class;
     }
 
     // make a device node
     ccd_dev = device_create(ccd_class,NULL,MKDEV(major,0),NULL,DEVICE_NAME);
     if (IS_ERR(ccd_dev)){
-	printk("Error: failed to create ccd_device!\n");
-	goto err_dev;
+        printk("Error: failed to create ccd_device!\n");
+        goto err_dev;
     }
 
     // initial gpio configuration

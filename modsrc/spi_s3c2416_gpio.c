@@ -26,21 +26,21 @@
  * GPE12 --> MOSI
  * GPE13 --> CLK
  */
-#define S3C2416_SPI_GPIO_CS	S3C2410_GPL(13)	
-#define S3C2416_SPI_GPIO_MISO	S3C2410_GPE(11)
+#define S3C2416_SPI_GPIO_CS S3C2410_GPL(13) 
+#define S3C2416_SPI_GPIO_MISO   S3C2410_GPE(11)
 #define S3C2416_SPI_GPIO_MOSI   S3C2410_GPE(12)
-#define S3C2416_SPI_GPIO_CLK	S3C2410_GPE(13)
+#define S3C2416_SPI_GPIO_CLK    S3C2410_GPE(13)
 
 #ifdef DEBUG
-#define DEBUG_NUM(a) 	printk(KERN_ALERT "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
+#define DEBUG_NUM(a)    printk(KERN_ALERT "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
 #define DEBUG_INFO(fmt, args...) printk(KERN_ALERT "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
 #else
 #define DEBUG_LINE(a)
 #define DEBUG_INFO(fmt, args...)
 #endif
 
-#define LED_PIN		S3C2410_GPC(0)
-#define DELAY_NANOSEC	10	
+#define LED_PIN     S3C2410_GPC(0)
+#define DELAY_NANOSEC   10  
 
 static struct spi_master *spi0_controller;
 static struct completion done;
@@ -64,7 +64,7 @@ static int set_cs(struct s3c_spi_gpio *pin, int flag)
 {
     // valid flag value is 0 or 1
     if ((flag & 0xFE) || (pin == NULL))
-	return -EINVAL;
+    return -EINVAL;
 
     s3c2410_gpio_setpin(pin->cs, flag & 0x01);
     return 0;
@@ -83,25 +83,26 @@ static int transmitb(unsigned char data, struct s3c_spi_gpio *pin)
     unsigned int mosi;
 
     if (pin == NULL)
-	return -EINVAL;
+    return -EINVAL;
 
     s3c2410_gpio_setpin(pin->clk, 1);
     s3c2410_gpio_setpin(pin->mosi, 0);
 
     data &= 0xff;
     for (bitcnt=7; bitcnt>=0; bitcnt--){
-	mosi = ((data >> bitcnt) & 0x01) ? 1 : 0 ;
-	s3c2410_gpio_setpin(pin->mosi, mosi);  // MSB
-	s3c2410_gpio_setpin(pin->clk, 0);
+        mosi = ((data >> bitcnt) & 0x01) ? 1 : 0 ;
+        s3c2410_gpio_setpin(pin->mosi, mosi);  // MSB
+        s3c2410_gpio_setpin(pin->clk, 0);
 
-	for (delaycnt=0; delaycnt<30; delaycnt++){
-	    asm("nop");
-	}
+        /* for (delaycnt=0; delaycnt<10; delaycnt++){ */
+        /*     asm("nop"); */
+        /* } */
 
-	s3c2410_gpio_setpin(pin->clk, 1);
-	for (delaycnt=0; delaycnt<30; delaycnt++){
-	    asm("nop");
-	}
+        /* s3c2410_gpio_setpin(pin->clk, 1); */
+        /* for (delaycnt=0; delaycnt<10; delaycnt++){ */
+        /*     asm("nop"); */
+        /* } */
+        s3c2410_gpio_setpin(pin->clk, 1);
     }
 
     s3c2410_gpio_setpin(pin->clk, 1);
@@ -153,21 +154,21 @@ static int s3c2416_spi_transfer(struct spi_device *spi, struct spi_message *mesg
 
     set_cs(&info->pin, 0);
     list_for_each_entry (t, &mesg->transfers, transfer_list) {
-	info->cur_t = t;
-	info->cur_cnt = 0;
-	init_completion(&done);
-	hrtimer_init(&timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	timer.function = hrtimer_func;
+    info->cur_t = t;
+    info->cur_cnt = 0;
+    init_completion(&done);
+    hrtimer_init(&timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    timer.function = hrtimer_func;
 
-	if (t->tx_buf){
-	    for (; info->cur_cnt < t->len; info->cur_cnt++){
-		err = transmitb(((unsigned char *)t->tx_buf)[0], &info->pin);
-		if (err){
-		    printk(KERN_ERR "S3C2416 GPIO SPI: Faild to transmit data!");
-		    return err;
-		}
-	    }
-	}
+    if (t->tx_buf){
+        for (; info->cur_cnt < t->len; info->cur_cnt++){
+        err = transmitb(((unsigned char *)t->tx_buf)[0], &info->pin);
+        if (err){
+            printk(KERN_ERR "S3C2416 GPIO SPI: Faild to transmit data!");
+            return err;
+        }
+        }
+    }
     }
     set_cs(&info->pin, 1);
 
@@ -198,8 +199,8 @@ static struct spi_master * create_spi_gpio_master(void)
 
     err = spi_register_master(master);
     if (err){
-	printk("s3c2416 spi master: Failed to register master!\n");
-	return NULL;
+        printk("s3c2416 spi master: Failed to register master!\n");
+        return NULL;
     }
 
     return master;
@@ -218,7 +219,7 @@ static int s3c2416_spi_init(void)
 {
     spi0_controller = create_spi_gpio_master();
     if (spi0_controller != NULL){
-	printk("s3c2416 spi master: s3c2416 spi module installed\n");
+        printk("s3c2416 spi master: s3c2416 spi module installed\n");
     }
 
     return 0;
