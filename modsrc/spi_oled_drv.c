@@ -367,12 +367,13 @@ static int __devinit spi_oled_probe(struct spi_device *spi)
 
     platdata = (int *)(spi->dev.platform_data);
     if (platdata == NULL){
-	printk("ERROR: Failed to get platform data!\n");
-	return -1;
+        printk("ERROR: Failed to get platform data!\n");
+        return -1;
     } else {
-	spi_oled_res = platdata[0];
-	spi_oled_dc  = platdata[1];
+        spi_oled_res = platdata[0];
+        spi_oled_dc  = platdata[1];
     }
+
     s3c2410_gpio_cfgpin(spi_oled_res, S3C2410_GPIO_OUTPUT);
     s3c2410_gpio_cfgpin(spi_oled_dc,  S3C2410_GPIO_OUTPUT);
     s3c2410_gpio_setpin(spi_oled_res, 1);

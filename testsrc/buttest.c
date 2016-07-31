@@ -45,12 +45,25 @@ int main(void)
                 if (errno != EAGAIN)
                     perror("read device button\n");
                continue;
-            } else {
-            for (i = 0;i < 4;i++)
-                if(key_value[i] != 0){
-                    printf("K%d %s, key value = 0x%02x\n",i+1,(key_value[i] & 0x80) ? "released" : key_value[i] ? "pressed down" : "", key_value[i]);
-                    if (key_value[i] & 0x80) 
-                        system("./ccdtest");
+            }
+
+            for (i = 0;i < 4;i++){
+                if (key_value[i])
+                    printf("\nK%d %s, key value = 0x%02x\n",i+1,(key_value[i] & 0x80) ? "released" : key_value[i] ? "pressed down" : "", key_value[i]);
+
+                switch (key_value[i]) {
+                case 0x81:
+                case 0x82:
+                    system("./ccdtest");
+                    break;
+                case 0x83:
+                    system("./ccdtest auto &");
+                    break;
+                case 0x84:
+                    system("pkill ccdtest");
+                    break;
+                default:
+                    break;
                 }
             }
         }

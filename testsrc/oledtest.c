@@ -205,74 +205,72 @@ int main(int argc, char **argv)
 
 #ifdef DEBUG
     printf("argc: %d\n", argc);
-    for (i=0; i<argc; i++){
-	printf("argv[%d]: %s\n", i, argv[i]);
-    }
+    for (i=0; i<argc; i++)
+        printf("argv[%d]: %s\n", i, argv[i]);
 #endif
     
     // check arguments
     if ((argc == 2) && !strcmp(argv[1], "init"))
-	cmd = 1;
+        cmd = 1;
     if ((argc == 3) && !strcmp(argv[1], "init")){
-	cmd = 1;
-	light = str2int(argv[2]);
-	printf("light: %d\n", light);
-	light &= 0x01;
+        cmd = 1;
+        light = str2int(argv[2]);
+        printf("light: %d\n", light);
+        light &= 0x01;
     }
     if ((argc == 2) && !strcmp(argv[1], "clear"))
-	cmd = 20; 
+        cmd = 20; 
     if ((argc == 3) && !strcmp(argv[1], "clear")){
-	cmd = 21;
-	row = str2int(argv[2]);
-	printf("row: %d\n", row);
-	if (row < 0 || row > 3){
-	    printf("Invalid row, valid row is 0~3.\n");
-	    return -1;
-	}
+        cmd = 21;
+        row = str2int(argv[2]);
+        printf("row: %d\n", row);
+        if (row < 0 || row > 3){
+            printf("Invalid row, valid row is 0~3.\n");
+            return -1;
+        }
     }
     if ((argc == 5) && !strcmp(argv[1], "print")){
-	cmd = 3;
-	row = str2int(argv[2]);
-	col = str2int(argv[3]);
-	printf("row: %d, col: %d\n", row, col);
-	str = argv[4];
-	if (row < 0 || row > 3){
-	    printf("Invalid row, valid row is 0~3.\n");
-	    return -1;
-	}
-	if (col< 0 || col > 120){
-	    printf("Invalid column, valid column is 0~120.\n");
-	    return -1;
-	}
+        cmd = 3;
+        row = str2int(argv[2]);
+        col = str2int(argv[3]);
+        printf("row: %d, col: %d\n", row, col);
+        str = argv[4];
+        if (row < 0 || row > 3){
+            printf("Invalid row, valid row is 0~3.\n");
+            return -1;
+        }
+        if (col< 0 || col > 120){
+            printf("Invalid column, valid column is 0~120.\n");
+            return -1;
+        }
     }
     if (!cmd){
-	usage(argv[0]);
-	return -1;
+        usage(argv[0]);
+        return -1;
     }
 
     fd = open("/dev/oled",O_RDWR);
     if(fd < 0){
-	printf("Can't open device: /dev/oled\n");
-	return -1;
+        printf("Can't open device: /dev/oled\n");
+        return -1;
     }
 
     switch (cmd){
     case 1 : // initial OLED
-	ioctl(fd, OLED_CMD_INIT, light);
-	break;
+        ioctl(fd, OLED_CMD_INIT, light);
+        break;
     case 20:	// clear screen
-	ioctl(fd, OLED_CMD_CLEAR_ALL, 0);
-	break;
+        ioctl(fd, OLED_CMD_CLEAR_ALL, 0);
+        break;
     case 21:	// clear 1 row
-	ioctl(fd, OLED_CMD_CLEAR_ROW, row);
-	break;
+        ioctl(fd, OLED_CMD_CLEAR_ROW, row);
+        break;
     case 3 :	// print a string 
-	printf("Prepare to print string, row: %d, col: %d, str: %s\n", row, col, str);
-	OLED_P8x16Str(col, row, str);
+        printf("Prepare to print string, row: %d, col: %d, str: %s\n", row, col, str);
+        OLED_P8x16Str(col, row, str);
 	break;
     default:
-	Error("Invalid command!");
-	break;
+        Error("Invalid command!");
+        break;
     }
-
 }
