@@ -32,11 +32,10 @@ void GPIO_Init(void)
 
 void LED_Ctrl(uchar on)
 {
-    if( on ){
-	rGPCDAT &= ~(1 << LED);
-    } else {
-	rGPCDAT |= (1 << LED);
-    }
+    if( on )
+        rGPCDAT &= ~(1 << LED);
+    else
+        rGPCDAT |= (1 << LED);
 }
 
 void Beep(uint ms)

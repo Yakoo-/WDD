@@ -1,10 +1,10 @@
-#define DEBUG 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
 
+#define DEBUG 1
 #include "gpioctl.h"
 
 static int fd;
@@ -16,25 +16,42 @@ void Error(char * errinfo)
     exit(1);
 }
 
+const static int max_int = 0x7fffffff;
+const static int min_int = 0xffffffff;
+const static int max_int_div_10 = 0x7fffffff / 10;
+const static int max_int_div_10_rem = 0x7fffffff % 10;
 // make sure the input char array is end up with '\0'.
-unsigned int str2int(char *str)
+int str2int(const char * const str)
 {
-    int result = 0;
-    int index = 0;
-    int unit = 0;
+    int i = 0, sign = 1, num = 0, digit = 0;
+    int len = strlen(str);
 
-    if (str == NULL)
-	Error("Invalid input in function str2int");
-    for (index=0; str[index]!='\0'; index++){
-	if ((str[index] < 48) || (str[index] > 57))
-	    Error("Invalid input in function str2int");
-	result = result * 10 + str[index] - 48;
+    /* ingore all whitespace */
+    while (i < len && ' ' == str[i]) i++;
+
+    if (i< len && '+' == str[i]){
+        sign = 1;
+        i++;
     }
 
-    return result;
+    if (i < len && '-' == str[i]){
+        sign = -1;
+        i++;
+    }
+
+    while (i < len){
+        digit = (str[i] >= '0' && str[i] <= '9') ? str[i] - '0' : -1;
+        if (digit < 0)
+            break;
+        if (num > max_int_div_10 || (max_int_div_10 == num && digit > max_int_div_10_rem) )
+            return sign ? max_int : min_int;
+        num = num * 10 + digit;
+        i++;
+    }
+
+    return sign * num;
 }
 
-// make sure the input char array is end up with '\0'.
 unsigned int get_pin(char *str)
 {
     int index = 0;

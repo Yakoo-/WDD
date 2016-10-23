@@ -9,21 +9,19 @@
 #include <linux/rtc.h>
 #include <string.h>
 
-/*
-int rtc_valid_tm(struct rtc_time *tm)
-{
-	if (tm->tm_year < 70
-		|| ((unsigned)tm->tm_mon) >= 12
-		|| tm->tm_mday < 1
-		|| tm->tm_mday > rtc_month_days(tm->tm_mon, tm->tm_year + 1900)
-		|| ((unsigned)tm->tm_hour) >= 24
-		|| ((unsigned)tm->tm_min) >= 60
-		|| ((unsigned)tm->tm_sec) >= 60)
-		return -EINVAL;
+/* int rtc_valid_tm(struct rtc_time *tm) */
+/* { */
+/*     if (tm->tm_year < 70 */
+/*         || ((unsigned)tm->tm_mon) >= 12 */
+/*         || tm->tm_mday < 1 */
+/*         || tm->tm_mday > rtc_month_days(tm->tm_mon, tm->tm_year + 1900) */
+/*         || ((unsigned)tm->tm_hour) >= 24 */
+/*         || ((unsigned)tm->tm_min) >= 60 */
+/*         || ((unsigned)tm->tm_sec) >= 60 ) */
+/*         return -EINVAL; */
 
-	return 0;
-}
-*/
+/*     return 0; */
+/* } */
 
 int print_time(struct rtc_time *ptm)
 {
@@ -31,15 +29,16 @@ int print_time(struct rtc_time *ptm)
 
 //    err = rtc_valid_tm(ptm);
     if (err){
-	fprintf(stderr, " Invalid date/time struct\n");
-	return err;
+        fprintf(stderr, "Invalid date/time struct\n");
+        return err;
     }
 
     printf(
-	"current time: "
-	"%d-%02d-%02d %02d:%02d:%02d\n",
-	ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
-	ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
+        "current time: "
+        "%d-%02d-%02d %02d:%02d:%02d\n",
+        ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
+        ptm->tm_hour, ptm->tm_min, ptm->tm_sec  
+        );
 
     return 0;
 }
@@ -50,31 +49,30 @@ int read_time(char *devpath, struct rtc_time *ptm)
     int err;
 
     if (devpath == NULL){
-	fprintf(stderr, " Null device path"); 
-	return -1;
+        fprintf(stderr, "Null device path\n"); 
+        return -1;
     }
 
     fd = open(devpath, O_RDONLY);
     if (fd < 0){
-	fprintf(stderr, " Failed to open device %s\n", devpath);
-	return err;
+        fprintf(stderr, "Failed to open device %s\n", devpath);
+        return -1;
     }
      
     err = ioctl(fd, RTC_RD_TIME, ptm);
-    if (err){
-	fprintf(stderr, " Failed to read rtc\n");
-	close(fd);
-	return err;
-    }
-
-//    err = rtc_valid_tm(ptm);
-    if (err){
-	fprintf(stderr, " Invalid date/time struct\n");
-	close(fd);
-	return err;
-    }
-
     close(fd);
+    if (err){
+        fprintf(stderr, "Failed to read rtc\n");
+        return err;
+    }
+
+    /* err = rtc_valid_tm(ptm); */
+    /* if (err){ */
+    /*     fprintf(stderr, "Invalid date/time struct\n"); */
+    /*     close(fd); */
+    /*     return err; */
+    /* } */
+
     return 0;
 }
 
@@ -84,30 +82,29 @@ int set_time(char *devpath, struct rtc_time *ptm)
     int err;
 
     if (devpath == NULL){
-	fprintf(stderr, " Null device path"); 
-	return -1;
+        fprintf(stderr, "Null device path"); 
+        return -1;
     }
 
-//    err = rtc_valid_tm(ptm);
-    if (err){
-	fprintf(stderr, " Invalid date/time struct\n");
-	return err;
-    }
+    /* err = rtc_valid_tm(ptm); */
+    /* if (err){ */
+    /*     fprintf(stderr, "Invalid date/time struct\n"); */
+    /*     return err; */
+    /* } */
 
     fd = open(devpath, O_WRONLY);
     if (fd < 0){
-	fprintf(stderr, " Failed to open device %s\n", devpath);
-	return err;
+        fprintf(stderr, "Failed to open device %s\n", devpath);
+        return -1;
     }
      
     err = ioctl(fd, RTC_SET_TIME, ptm);
+    close(fd);
     if (err){
-	fprintf(stderr, " Failed to set rtc\n");
-	close(fd);
-	return err;
+        fprintf(stderr, "Failed to set rtc\n");
+        return err;
     }
 
-    close(fd);
     return 0;
 }
 
@@ -118,56 +115,56 @@ int main(void)
     char *devpath = "/dev/rtc0";
     struct rtc_time tm;
 
-    printf("\n\trtc test for 2416\n"); 
+    printf("\trtc test for 2416\n"); 
 
     err = read_time(devpath, &tm);
     if (err){
-	fprintf(stderr, " Faild to read time!");
-	exit(1);
-    }else{
-	print_time(&tm);
+        fprintf(stderr, "Failed to read time!\n");
+        exit(1);
     }
+
+    print_time(&tm);
     
-    tm.tm_year -=1;
+    tm.tm_year -= 1;
     err = set_time(devpath, &tm);
     if (err){
-	fprintf(stderr, " Faild to set time!");
-	exit(1);
+        fprintf(stderr, "Failed to set time!\n");
+        exit(1);
     }
 
     err = read_time(devpath, &tm);
     if (err){
-	fprintf(stderr, " Faild to read time!");
-	exit(1);
+        fprintf(stderr, "Failed to read time!\n");
+        exit(1);
     }else{
-	print_time(&tm);
+        print_time(&tm);
     }
 
     tm.tm_year +=1;
     err = set_time(devpath, &tm);
     if (err){
-	fprintf(stderr, " Faild to set time!");
-	exit(1);
+        fprintf(stderr, "Failed to set time!\n");
+        exit(1);
     }
 
     err = read_time(devpath, &tm);
     if (err){
-	fprintf(stderr, " Faild to read time!");
-	exit(1);
+        fprintf(stderr, "Failed to read time!\n");
+        exit(1);
     }else{
-	print_time(&tm);
+        print_time(&tm);
     }
 
 /*
     fd = open(devpath, O_RDWR);
     if (fd < 0){
-	fprintf(stderr, " Failed to open device %s\n", devpath);
+	fprintf(stderr, "Failed to open device %s\n", devpath);
 	return err;
     }
     
     err = ioctl(fd, RTC_RD_TIME, &tm);
     if (err){
-	fprintf(stderr, " Failed to read rtc\n");
+	fprintf(stderr, "Failed to read rtc\n");
 	close(fd);
 	return err;
     }else{
@@ -182,7 +179,7 @@ int main(void)
     ntm.tm_year -= 1;
     err = ioctl(fd, RTC_SET_TIME, &ntm);
     if (err){
-	fprintf(stderr, " Failed to set rtc\n");
+	fprintf(stderr, "Failed to set rtc\n");
 	close(fd);
 	return err;
     }else{
@@ -195,12 +192,12 @@ int main(void)
 
     err = ioctl(fd, RTC_SET_TIME, &tm);
     if (err){
-	fprintf(stderr, " Failed to set rtc\n");
+	fprintf(stderr, "Failed to set rtc\n");
 	close(fd);
 	return err;
     }else{
 	printf(
-	    "restore time to\t: " 
+	    "restore time to\t: "
 	    "%d-%02d-%02d %02d:%02d:%02d\n",
 	    tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 	    tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -208,7 +205,7 @@ int main(void)
 
     err = ioctl(fd, RTC_RD_TIME, &tm);
     if (err){
-	fprintf(stderr, " Failed to read rtc\n");
+	fprintf(stderr, "Failed to read rtc\n");
 	close(fd);
 	return err;
     }else{
@@ -232,7 +229,7 @@ int main(void)
 /*
     err = read(fd, &tm, sizeof(tm));
     if (err){
-	fprintf(stderr, " Failed to read rtc fd\n");
+	fprintf(stderr, "Failed to read rtc fd\n");
 	close(fd);
 	return err;
     }
@@ -241,7 +238,7 @@ int main(void)
 /*
     err = rtc_valid_tm(&tm);
     if (err){
-	fprintf(stderr, " Invalid date/time struct\n");
+	fprintf(stderr, "Invalid date/time struct\n");
 	close(fd);
 	return err;
     }

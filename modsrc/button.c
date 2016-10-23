@@ -11,8 +11,8 @@
 #include <linux/interrupt.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
-//#include <asm/arch/regs-gpio.h>
-//#include <asm/hardware.h>
+
+#include "common.h"
 
 #define DEVICE_NAME	"button"
 #define BUTTON_MAJOR	232
@@ -29,10 +29,10 @@ struct button_irq_desc
 
 static struct button_irq_desc button_irqs[] = 
 {
-    {IRQ_EINT8,  S3C2410_GPG(0), S3C2410_GPG0_EINT8,  0, "KEY1"},
-    {IRQ_EINT9,  S3C2410_GPG(1), S3C2410_GPG1_EINT9,  1, "KEY2"},
-    {IRQ_EINT10, S3C2410_GPG(2), S3C2410_GPG2_EINT10, 2, "KEY3"},
-    {IRQ_EINT11, S3C2410_GPG(3), S3C2410_GPG3_EINT11, 3, "KEY4"}
+    {IRQ_EINT9,  S3C2410_GPG(1), S3C2410_GPG1_EINT9,  0, "KEY1"},
+    {IRQ_EINT10, S3C2410_GPG(2), S3C2410_GPG2_EINT10, 1, "KEY2"},
+    {IRQ_EINT11, S3C2410_GPG(3), S3C2410_GPG3_EINT11, 2, "KEY3"},
+    {IRQ_EINT12, S3C2410_GPG(4), S3C2410_GPG4_EINT12, 3, "KEY4"}
 };
 
 static unsigned int button_total = sizeof(button_irqs)/sizeof(button_irqs[0]);

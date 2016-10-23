@@ -1,3 +1,5 @@
+#define DEBUG           1
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
@@ -9,7 +11,6 @@
 #include <linux/interrupt.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
-//#include <linux/ioctl.h>
 #include <linux/io.h>
 #include <linux/slab.h>
 
@@ -19,16 +20,9 @@
 #include <plat/fiq.h>
 
 #include "ccd_s3c2416_fiq.h"
+#include "common.h"
 
 #define DEVICE_NAME     "linear-ccd"
-
-#ifdef DEBUG
-#define DEBUG_NUM(a)    printk(KERN_DEBUG "[%s:%d] "#a" = %d\r\n",__func__,__LINE__,a)
-#define DEBUG_INFO(fmt, args...) printk(KERN_DEBUG "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
-#else
-#define DEBUG_NUM(a)
-#define DEBUG_INFO(fmt, args...)
-#endif
 
 
 /* gpio configuration */
@@ -36,21 +30,23 @@ struct gpio_desc {
     char *name;
     int pin;
     int pin_cfg;
+    int init_val;
     int irq;
-    int pull;
 };
 
 #define INDEX_START     0
 #define INDEX_TRIGD     1
 #define INDEX_DATIN     2
-#define INDEX_LEDCT     3
-#define GPIO_CNT        4
+#define INDEX_LEDCT1    3
+#define INDEX_LEDCT2    4
+#define GPIO_CNT        5
 
 static struct gpio_desc ccd_gpio[] = {
-    {"Start",  S3C2410_GPF(5), S3C2410_GPIO_OUTPUT , -1, 1},
-    {"TrigD",  S3C2410_GPF(3), S3C2410_GPF3_EINT3  , IRQ_EINT3, -1},
-    {"DataIn", S3C2410_GPG(4), S3C2410_GPIO_INPUT  , -1, 0},
-    {"LEDCtr", S3C2410_GPE(15), S3C2410_GPIO_OUTPUT , -1, 0}
+    {"Start",  S3C2410_GPG(0), S3C2410_GPIO_OUTPUT, 1, -1        },
+    {"TrigD",  S3C2410_GPF(0), S3C2410_GPF0_EINT0 , 0, IRQ_EINT0 },
+    {"DataIn", S3C2410_GPF(6), S3C2410_GPIO_INPUT , 0, -1        },
+    {"LEDCT1", S3C2410_GPF(5), S3C2410_GPIO_OUTPUT, 0, -1        },
+    {"LEDCT2", S3C2410_GPF(3), S3C2410_GPIO_OUTPUT, 0, -1        }
 
 };
 
@@ -68,7 +64,7 @@ struct fiq_args {
 };
 
 /* global variables */
-static char __initdata banner[] = "\nS10077 linear CCD Driver(FIQ mode), By Kerwin.Yan\n\n";
+static char __initdata banner[] = "\nS10077 linear CCD Driver(FIQ mode), By Kerwin.Yan\n";
 static unsigned int *pixels_buffer;
 static struct fiq_args *fiq_arg;
 static struct class *ccd_class;
@@ -97,11 +93,6 @@ static int ccd_open(struct inode *inode, struct file *file)
     irq_set_irq_type(IRQ_NUM, IRQF_TRIGGER_FALLING);
     s3c24xx_set_fiq(IRQ_NUM, 1);
     enable_irq(IRQ_NUM);
-
-    DEBUG_INFO("fiq_arg: 0x%p", fiq_arg);
-    DEBUG_INFO("buffer : 0x%p", pixels_buffer);
-    DEBUG_INFO("S3C24XX_VA_IRQ: 0x%p", S3C24XX_VA_IRQ);
-    DEBUG_INFO("S3C24XX_VA_GPIO: 0x%p", S3C24XX_VA_GPIO);
 
     printk("FIQ codes inserted, code length: %d Bytes\n", codes->length);
     return 0;
@@ -142,7 +133,8 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     int ret;
     struct pt_regs regs;
 
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 1);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 1);
+    /* s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 1); */
 
     /* Signal charge integration time is positive associate to */
     /* the High-to-Low ratio of START pulses. */
@@ -154,7 +146,7 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     /* reference to S10077 datasheet */
     /* START pulse interval >= 1/1Mhz * 12339 = 12.3ms */
     msleep(13);
-    /* START pin should have been pulled up in fiq driver */
+    /* START pin should have been pulled up in fiq handler */
 
     /* enable valid receiving procedure */
     reset_fiq_regs();
@@ -162,15 +154,13 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 0);
     msleep(13);
 
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT].pin, 0);
+    /* reset pins value */
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 0);
+    /* s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 0); */
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_START ].pin, 1);
 
     get_fiq_regs(&regs);
     DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
-    DEBUG_INFO("buffer: 0x%p", (unsigned int *)regs.uregs[reg_buffer]);
-    DEBUG_INFO("tempd : %d"  , (unsigned int  )regs.uregs[reg_tmpd]);
-    DEBUG_INFO("tempa : 0x%p", (unsigned int *)regs.uregs[reg_tmpa]);
-    DEBUG_INFO("index : 0x%p", (unsigned int *)regs.uregs[reg_index]);
-    DEBUG_INFO("datain: 0x%p", (unsigned int *)regs.uregs[reg_datain]);
 
     if (fiq_arg->status != FIQ_STATUS_FINISHED){
         if (regs.uregs[reg_index] != 0x03ff0009){
@@ -243,14 +233,10 @@ static int __init ccd_init(void)
     }
 
     // initial gpio configuration
-    for (index=0; index<GPIO_CNT; index++) {
+    for (index = 0; index < GPIO_CNT; index++){
         s3c2410_gpio_cfgpin(ccd_gpio[index].pin, ccd_gpio[index].pin_cfg);
-#if 0
-        if (ccd_gpio[index].pull >= 0)
-            s3c2410_gpio_pullup(ccd_gpio[index].pin, ccd_gpio[index].pull);
-#endif
+        s3c2410_gpio_setpin(ccd_gpio[index].pin, ccd_gpio[index].init_val);  // ccd stop
     }
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_START].pin, 1);  // ccd stop
 
     printk(DEVICE_NAME " initialized.\n\n");
     return 0;

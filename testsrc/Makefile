@@ -9,7 +9,7 @@ OBJ = $(patsubst %.c,%.o,${DIR})
 all:$(OBJ)
 
 .c.o:
-	$(CC) -o $@ $<
+	$(CC) -o $@ $< -lfftw3f
 
 clean:
 	rm -f *.o

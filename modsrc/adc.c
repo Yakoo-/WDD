@@ -88,7 +88,7 @@ static irqreturn_t adc_int_handler(int irq, void *dev_id)
     return IRQ_HANDLED;
 }
 
-static ssize_t adc_read(struct file *flip, char *buffer, size_t count, loff_t *ppos)
+static ssize_t adc_read(struct file *flip, char __user *buffer, size_t count, loff_t *ppos)
 {
     char str[20];
     int value;

@@ -1,5 +1,3 @@
-#define DEBUG 1
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,26 +9,7 @@
 #include <errno.h>
 
 #include "Font_Libs.h"
-
-#define OLED_CMD_INIT	    0x01
-#define OLED_CMD_CLEAR_ALL  0x02
-#define OLED_CMD_CLEAR_ROW  0x03
-#define OLED_CMD_FILL	    0X04
-#define OLED_CMD_SET_POS    0x05    //Y=row= (arg >> 8) & 0xff; X=col= arg & 0xff;
-#define OLED_CMD_WR_DAT	    0x06
-#define OLED_CMD_WR_CMD	    0x07
-#define uchar8	    unsigned char
-#define uchar	    unsigned char
-#define ushort16    unsigned short
-#define ushort	    unsigned short
-
-#ifdef DEBUG
-#define DEBUG_LINE(a) 	printf("[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
-#define DEBUG_INFO(fmt, args...) printf("[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
-#else
-#define DEBUG_LINE(a)
-#define DEBUG_INFO(fmt, args...)
-#endif
+#include "oled.h"
 
 static int fd;
 
@@ -196,18 +175,16 @@ void usage(char *name)
 
 int main(int argc, char **argv)
 {
-    int cmd = 0;
+    uint cmd = 0, oled_cmd = 0, oled_arg = 0;
     int row = -1;
     int col = -1;
     char *str;
     int light = 0;
     int i = 0;
 
-#ifdef DEBUG
-    printf("argc: %d\n", argc);
+    DEBUG_INFO("argc: %d\n", argc);
     for (i=0; i<argc; i++)
-        printf("argv[%d]: %s\n", i, argv[i]);
-#endif
+        DEBUG_INFO("argv[%d]: %s\n", i, argv[i]);
     
     // check arguments
     if ((argc == 2) && !strcmp(argv[1], "init"))
@@ -215,7 +192,7 @@ int main(int argc, char **argv)
     if ((argc == 3) && !strcmp(argv[1], "init")){
         cmd = 1;
         light = str2int(argv[2]);
-        printf("light: %d\n", light);
+        DEBUG_INFO("light: %d\n", light);
         light &= 0x01;
     }
     if ((argc == 2) && !strcmp(argv[1], "clear"))
@@ -223,7 +200,7 @@ int main(int argc, char **argv)
     if ((argc == 3) && !strcmp(argv[1], "clear")){
         cmd = 21;
         row = str2int(argv[2]);
-        printf("row: %d\n", row);
+        DEBUG_INFO("row: %d\n", row);
         if (row < 0 || row > 3){
             printf("Invalid row, valid row is 0~3.\n");
             return -1;
@@ -233,10 +210,10 @@ int main(int argc, char **argv)
         cmd = 3;
         row = str2int(argv[2]);
         col = str2int(argv[3]);
-        printf("row: %d, col: %d\n", row, col);
+        DEBUG_INFO("row: %d, col: %d\n", row, col);
         str = argv[4];
-        if (row < 0 || row > 3){
-            printf("Invalid row, valid row is 0~3.\n");
+        if (row < 0 || row > 7){
+            printf("Invalid row, valid row is 0~7.\n");
             return -1;
         }
         if (col< 0 || col > 120){
@@ -249,28 +226,38 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    fd = open("/dev/oled",O_RDWR);
+    fd = open(OLED_DEVICE_PATH, O_RDWR);
     if(fd < 0){
-        printf("Can't open device: /dev/oled\n");
+        printf("Can't open device: " OLED_DEVICE_PATH "\n");
         return -1;
     }
 
     switch (cmd){
     case 1 : // initial OLED
-        ioctl(fd, OLED_CMD_INIT, light);
+        oled_cmd = OLED_CMD_INIT;
+        oled_arg = light;
         break;
     case 20:	// clear screen
-        ioctl(fd, OLED_CMD_CLEAR_ALL, 0);
+        oled_cmd = OLED_CMD_CLR_ALL;
+        oled_arg = 0;
         break;
     case 21:	// clear 1 row
-        ioctl(fd, OLED_CMD_CLEAR_ROW, row);
+        oled_cmd = OLED_CMD_CLEAR_ROW;
+        oled_arg = row;
         break;
     case 3 :	// print a string 
-        printf("Prepare to print string, row: %d, col: %d, str: %s\n", row, col, str);
-        OLED_P8x16Str(col, row, str);
+        DEBUG_INFO("Prepare to print string, row: %d, col: %d, str: %s\n", row, col, str);
+        OLED_P6x8Str(col, row, str);
 	break;
     default:
-        Error("Invalid command!");
+        printf("Invalid command!");
         break;
     }
+
+    if (oled_cmd && oled_arg)
+        ioctl(fd, oled_cmd, oled_arg);
+
+    close(fd);
+
+    return 0;
 }

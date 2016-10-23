@@ -16,38 +16,19 @@
 #include <linux/gpio.h>
 #include <plat/gpio-cfg.h>
 
-#include <linux/spi/Font_Libs.h>
+#include "oled.h"
 
-#define OLED_CMD_INIT	    0x01
-#define OLED_CMD_CLEAR_ALL  0x02
-#define OLED_CMD_CLEAR_PAGE 0x03
-#define OLED_CMD_FILL	    0x04
-#define OLED_CMD_SET_POS    0x05    //Y=page= (arg >> 8) & 0xff; X=col= arg & 0xff;
-#define OLED_CMD_WR_DAT	    0x06
-#define OLED_CMD_WR_CMD	    0x07
-#define uchar8	    unsigned char
-#define uchar	    unsigned char
-#define ushort16    unsigned short
-#define ushort    unsigned short
+#define OLED_PIN_RES    S3C2410_GPE(14)
+#define OLED_PIN_DC     S3C2410_GPE(15)
 
-#define DEVICE_NAME	"oled"
-
-#ifdef DEBUG
-#define DEBUG_LINE(a) 	printk(KERN_DEBUG "[%s:%d] flag=%d\r\n",__func__,__LINE__,a) 
-#define DEBUG_INFO(fmt, args...) printk(KERN_DEBUG "[%s:%d]"#fmt"\n", __func__, __LINE__, ##args)
-#else
-#define DEBUG_LINE(a)
-#define DEBUG_INFO(fmt, args...)
-#endif
 
 static int major;
 static struct class *class;
-static int spi_oled_res;
-static int spi_oled_dc;
+static const int spi_oled_res = OLED_PIN_RES;
+static const int spi_oled_dc = OLED_PIN_DC;
 static struct spi_device *spi_oled_dev;
 static uchar8 *ker_buf;
 
-//OLED写数据
 void OLED_WrDat(uchar8 data)
 {
     s3c2410_gpio_setpin(spi_oled_dc, 1);
@@ -55,13 +36,11 @@ void OLED_WrDat(uchar8 data)
 
 }
 
-//OLED写命令
 void OLED_WrCmd(uchar8 cmd)
 {
     s3c2410_gpio_setpin(spi_oled_dc, 0);
     spi_write(spi_oled_dev, &cmd, 1);
 }
-
 
 void SetStartColumn(uchar8 ucData)
 {
@@ -202,44 +181,11 @@ void SetVCOMH(uchar8 ucData)
     OLED_WrCmd(ucData);      // Default => 0x20 (0.77*VCC)
 }
 
-/*****************************************************************************
- 函 数 名  : OLED_SetPos
- 功能描述  : 设置坐标
- 输入参数  : uchar8 ucIdxX
-             uchar8 ucIdxY
- 输出参数  : NONE
- 返 回 值  : NONE
-*****************************************************************************/
 void OLED_SetPos(uchar8 ucIdxX, uchar8 ucIdxY)
 {
     OLED_WrCmd(0xb0 + ucIdxY);
     OLED_WrCmd(((ucIdxX & 0xf0) >> 4) | 0x10);
-    OLED_WrCmd((ucIdxX & 0x0f) | 0x00);
-}
-
-/*****************************************************************************
- 函 数 名  : OLED_Fill
- 功能描述  : 对全屏写入同一个字符函数
-             如 OLED_Fill(0x01);    对于某一位0为不亮 1为亮
-            ------------------------------------------------------
- 输入参数  : uchar8 ucData
- 输出参数  : NONE
- 返 回 值  : NONE
-*****************************************************************************/
-void OLED_Fill(uchar8 ucData)
-{
-    unsigned int ucPage,ucColumn;
-
-    for(ucPage = 0; ucPage < 8; ucPage++)
-    {
-        OLED_WrCmd(0xb0 + ucPage);  //0xb0+0~7表示页0~7
-        OLED_WrCmd(0x00);           //0x00+0~16表示将128列分成16组其地址在某组中的第几列
-        OLED_WrCmd(0x10);           //0x10+0~16表示将128列分成16组其地址所在第几组
-        for(ucColumn = 0; ucColumn < 128; ucColumn++)
-        {
-            OLED_WrDat(ucData);
-        }
-    }
+    OLED_WrCmd( (ucIdxX & 0x0f) | 0x00);
 }
 
 /*********************************
@@ -249,16 +195,30 @@ void OLED_Fill(uchar8 ucData)
 void OLED_ClearPage(uchar8 ucPage)
 {
     uchar8 ucColumn;
-    OLED_WrCmd(0xb0 + ucPage);  //0xb0+0~7表示页0~7
-    OLED_WrCmd(0x00);           //0x00+0~16表示将128列分成16组其地址在某组中的第几列
-    OLED_WrCmd(0x10);           //0x10+0~16表示将128列分成16组其地址所在第几组
     for(ucColumn = 0; ucColumn < 128; ucColumn++)
     {
-	OLED_WrDat(0);
+        OLED_SetPos(ucColumn, ucPage);
+        OLED_WrDat(0);
     }
 }
 
+void OLED_Fill(uchar8 ucData)
+{
+    unsigned int ucPage,ucColumn;
+    DEBUG_NUM(ucData);
 
+    for(ucPage = 0; ucPage < 8; ucPage++)
+    {
+        OLED_WrCmd(0xb0 + ucPage); 
+        OLED_WrCmd(0x00);
+        OLED_WrCmd(0x10);
+        for(ucColumn = 0; ucColumn < 128; ucColumn++)
+        {
+            OLED_WrDat(ucData);
+        }
+        /* OLED_ClearPage(ucData); */
+    }
+}
 /*****************************************************************************
  函 数 名  : OLED_Init
  功能描述  : OOLED初始化
@@ -295,45 +255,48 @@ void OLED_Init(unsigned char light)
     SetDisplayOnOff(0x01);     // Display On (0x00/0x01)
     (light & 0x1) ? OLED_Fill(0xFF) : OLED_Fill(0x00) ;	 // 初始清屏
     OLED_SetPos(0,0);
-
-    return;
 }
 
 static long oled_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     unsigned char X, Y;    
-    switch (cmd)
-    {
+    unsigned char i = 0;
+
+    switch (cmd) {
 	case OLED_CMD_INIT:
 	    OLED_Init(arg & 0x01);
-	    return 0;
-	case OLED_CMD_CLEAR_ALL:
+        break;
+	case OLED_CMD_CLR_ALL:
 	    OLED_Fill(0x00);
-	    return 0;
-	case OLED_CMD_CLEAR_PAGE:
-	    if (arg < 8){
-		OLED_ClearPage((char)arg);
-		return 0;
-	    }else{
-		return -EINVAL;
-	    }
+        break;
+	case OLED_CMD_CLEAR_ROW:
+        OLED_ClearPage( (char)(0xff & arg) );
+        break;
 	case OLED_CMD_FILL:
 	    OLED_Fill((uchar)arg);
-	    return 0;
+        break;
 	case OLED_CMD_SET_POS:
 	    X= (uchar)(arg & 0xff);		// index X
 	    Y= (uchar)((arg >> 8) & 0xff);	// index Y
 	    OLED_SetPos(X, Y);
-	    return 0;
+        break;
 	case OLED_CMD_WR_DAT:
 	    OLED_WrDat((uchar)arg);
-	    return 0;
+        break;
 	case OLED_CMD_WR_CMD:
 	    OLED_WrCmd((uchar)arg);
-	    return 0;
+        break;
+    case OLED_CMD_CLR_EXCEPT:	
+        for (i = 0; i < OLED_ROW_NUM; i++)
+            if (i == arg)
+                continue;
+            else
+                OLED_ClearPage(i);
+        break;
 	default:
-	    return -EINVAL;
+        break;
     }
+    return 0;
 }
 
 static ssize_t oled_write(struct file *file, const uchar8 __user *buf, size_t count, loff_t *ppos)
@@ -341,11 +304,12 @@ static ssize_t oled_write(struct file *file, const uchar8 __user *buf, size_t co
     int err;
 
     if (count > 4096)
-	return -EINVAL;
+        return -EINVAL;
+
     err = copy_from_user(ker_buf, buf, count);
     if(err){
-	printk(KERN_ERR "Failed to copy data from user!");
-	return err;
+        printk(KERN_ERR "Failed to copy data from user!");
+        return err;
     }
 
     spi_write(spi_oled_dev, buf,count);
@@ -361,18 +325,7 @@ static struct file_operations oled_ops = {
 
 static int __devinit spi_oled_probe(struct spi_device *spi)
 {
-    int *platdata;
-
     spi_oled_dev = spi;
-
-    platdata = (int *)(spi->dev.platform_data);
-    if (platdata == NULL){
-        printk("ERROR: Failed to get platform data!\n");
-        return -1;
-    } else {
-        spi_oled_res = platdata[0];
-        spi_oled_dc  = platdata[1];
-    }
 
     s3c2410_gpio_cfgpin(spi_oled_res, S3C2410_GPIO_OUTPUT);
     s3c2410_gpio_cfgpin(spi_oled_dc,  S3C2410_GPIO_OUTPUT);
@@ -382,11 +335,11 @@ static int __devinit spi_oled_probe(struct spi_device *spi)
     ker_buf = kmalloc(4096, GFP_KERNEL);
     
     // regist a file operation
-    major = register_chrdev(0, "oled", &oled_ops);
+    major = register_chrdev(0, OLED_DEVICE_NAME, &oled_ops);
     // make a device class 
-    class = class_create(THIS_MODULE, "oled");
+    class = class_create(THIS_MODULE, OLED_DEVICE_NAME);
     // make a device node
-    device_create(class, NULL, MKDEV(major, 0), NULL, "oled");
+    device_create(class, NULL, MKDEV(major, 0), NULL, OLED_DEVICE_NAME);
 
     return 0;
 }
@@ -395,14 +348,14 @@ static int __devexit spi_oled_remove(struct spi_device *spi)
 {
     device_destroy(class, MKDEV(major, 0));
     class_destroy(class);
-    unregister_chrdev(major, "oled");
+    unregister_chrdev(major, OLED_DEVICE_NAME);
     kfree(ker_buf);
     return 0;
 }
 
 static struct spi_driver spi_oled_driver = {
     .driver = {
-	.name	= "oled",
+	.name	= OLED_DEVICE_NAME,
 	.owner	= THIS_MODULE,
     },
     .probe	= spi_oled_probe,

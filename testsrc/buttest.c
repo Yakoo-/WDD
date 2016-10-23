@@ -9,6 +9,8 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
+#include "common.h"
+
 int main(void)
 {
     int i;
@@ -49,18 +51,23 @@ int main(void)
 
             for (i = 0;i < 4;i++){
                 if (key_value[i])
-                    printf("\nK%d %s, key value = 0x%02x\n",i+1,(key_value[i] & 0x80) ? "released" : key_value[i] ? "pressed down" : "", key_value[i]);
+                    DEBUG_INFO("\nK%d %s, key value = 0x%02x\n",i+1,(key_value[i] & 0x80) ? "released" : key_value[i] ? "pressed down" : "", key_value[i]);
 
                 switch (key_value[i]) {
                 case 0x81:
+                    system("pkill ccd");
+                    system("./ccd &");
+                    break;
                 case 0x82:
-                    system("./ccdtest");
+                    system("pkill ccd");
+                    system("./ccd 16 &");
                     break;
                 case 0x83:
-                    system("./ccdtest auto &");
+                    system("pkill ccd");
+                    system("./ccd 50 &");
                     break;
                 case 0x84:
-                    system("pkill ccdtest");
+                    system("pkill ccd");
                     break;
                 default:
                     break;

@@ -297,7 +297,7 @@ static struct  i2c_board_info smdk2416_i2c_dev __initdata  = {
 };
 
 /* spi0 device, for OLED Screen */
-static int oled_pin[]={S3C2410_GPF(6), S3C2410_GPF(7)};
+static int oled_pin[]={S3C2410_GPE(14), S3C2410_GPE(15)};
 
 static struct spi_board_info spi_info_com2416[] = {
     {

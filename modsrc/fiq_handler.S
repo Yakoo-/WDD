@@ -32,7 +32,7 @@ fiq_start:
     cmp     reg_tmpd, # CCD_START_TLP
     ldrcs   reg_tmpa, [reg_args, # ARGS_VA_GPIO_OFFSET]
     ldrcs   reg_tmpd, [reg_tmpa, # START_GPXDAT_BASE - S3C24XX_VA_GPIO]
-    orrcs    reg_tmpd, reg_tmpd, # START_PIN_MASK
+    orrcs   reg_tmpd, reg_tmpd, # START_PIN_MASK
     strcs   reg_tmpd, [reg_tmpa, # START_GPXDAT_BASE - S3C24XX_VA_GPIO]
 
     /* Test and save 1 bit pin value */

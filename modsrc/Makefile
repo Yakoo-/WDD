@@ -15,7 +15,7 @@ obj-m	+= spi_oled_drv.o
 obj-m	+= spi_s3c2416_gpio.o
 obj-m	+= timermod.o
 obj-m	+= gpioctl.o
-obj-m	+= spi_s3c2416.o
+#obj-m	+= spi_s3c2416.o
 
 obj-m	+= linearccd_fiq.o
 linearccd_fiq-objs	:= fiq_handler.o linearccd.o
