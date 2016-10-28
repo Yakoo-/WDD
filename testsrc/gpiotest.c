@@ -10,12 +10,6 @@
 static int fd;
 static char *funcname;
 
-void Error(char * errinfo)
-{
-    printf("%s: Deadly error occured!\nError info: %s\n", funcname, errinfo);
-    exit(1);
-}
-
 const static int max_int = 0x7fffffff;
 const static int min_int = 0xffffffff;
 const static int max_int_div_10 = 0x7fffffff / 10;

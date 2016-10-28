@@ -1,260 +1,177 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/ioctl.h>
-#include <errno.h>
 
+#include "common.h"
 #include "oled.h"
+#include "oled_ctrl.h"
 
-static int fd;
-const unsigned char Font_6x8[][6];
-const unsigned char Font_8x16[];
+static int fd_oled = -1;
 
-void OLED_SetPos(uchar x, uchar y)
+void OLED_Init()
 {
-    ioctl(fd, OLED_CMD_SET_POS, x | (y << 8));
+    fd_oled = open(OLED_DEVICE_PATH, O_WRONLY);
+    if(fd_oled < 0){
+        printf("Can't open device: " OLED_DEVICE_PATH "\n");
+        return;
+    }
+
+    ioctl(fd_oled, OLED_CMD_INIT, 0);
+}
+
+void OLED_WrBits(uchar col, uchar row, uchar bits)
+{
+    if (col < OLED_COL_NUM && row < OLED_ROW_NUM){
+        OLED_SetPos(col, row);
+        OLED_WrDat(bits);
+    }
+}
+
+void OLED_SetPos(uchar col, uchar row)
+{
+    if (fd_oled < 0)
+        OLED_Init();
+
+    ioctl(fd_oled, OLED_CMD_SET_POS, col | (row << 8));
 }
 
 void OLED_WrDat(uchar data)
 {
-    ioctl(fd, OLED_CMD_WR_DAT, data);
+    if (fd_oled < 0)
+        OLED_Init();
+
+    ioctl(fd_oled, OLED_CMD_WR_DAT, data);
 }
 
 void OLED_WrCmd(uchar cmd)
 {
-    ioctl(fd, OLED_CMD_WR_CMD, cmd);
+    if (fd_oled < 0)
+        OLED_Init();
+
+    ioctl(fd_oled, OLED_CMD_WR_CMD, cmd);
+}
+
+/*****************************************************************************
+ NAME      : OLED_PrintPattern
+ FUNCTION  : display data pattern, from left to right, top to bottom
+ INPUT     : uchar8  col      column number, 0~127
+             uchar8  row      row number, 0～7
+             uchar8 *pattern  pattern array
+             uint    len      pattern length
+ OUTPUT    : NONE
+ RETURN    : NONE
+*****************************************************************************/
+void OLED_PrintPattern(uchar8 col, uchar8 row, uchar8 *pattern, uint length)
+{
+    if (fd_oled < 0)
+        OLED_Init();
+
+    OLED_SetPos(col, row);
+    write(fd_oled, pattern, length);
 }
 
 /*****************************************************************************
  函 数 名  : OLED_P6x8Char
  功能描述  : 显示一个6x8标准ASCII字符
- 输入参数  : uchar8 ucIdxX col  显示的横坐标0~122
-             uchar8 ucIdxY row 页范围0～7
-             uchar8 ucData  显示的字符
+ 输入参数  : uchar8 col col 显示的横坐标0~122
+             uchar8 row row 页范围0～7
+             uchar8 data    显示的字符
  输出参数  : NONE
  返 回 值  : NONE
 *****************************************************************************/
-void OLED_P6x8Char(uchar8 ucIdxX, uchar8 ucIdxY, uchar8 ucData)
+void OLED_P6x8Char(uchar8 col, uchar8 row, uchar8 data)
 {
-    uchar8 i, ucDataTmp;
+    static const uchar col_per_char = 6;
+    static const uchar max_col = 122;   // OLED_COL_NUM = 128
+    static const uchar max_row = 7;
+    uchar8 i, font_inx;
 
-    ucDataTmp = ucData-32;
-    if(ucIdxX > 122)
-    {
-        ucIdxX = 0;
-	if (ucIdxY < 7)
-	    ucIdxY++;
-	else
-	    return;
+    while (col > max_col){
+        col -= max_col;
+        row++;
     }
+    if ( row > max_row )
+        return;
 
-    OLED_SetPos(ucIdxX, ucIdxY);
+    /* valid character starts from ' '(32) in ASCII */
+    font_inx = data - ' ';
 
-    for(i = 0; i < 6; i++)
-    {
-        OLED_WrDat(Font_6x8[ucDataTmp][i]);
-    }
+    OLED_SetPos(col, row);
+    for(i = 0; i < col_per_char; i++)
+        OLED_WrDat(Font_6x8[font_inx][i]);
 }
+
 
 /*****************************************************************************
  函 数 名  : OLED_P6x8Str
  功能描述  : 写入一组6x8标准ASCII字符串
- 输入参数  : uchar8 ucIdxX       显示的横坐标0~122
-             uchar8 ucIdxY       页范围0～7
-             uchar8 ucDataStr[]  显示的字符串
+ 输入参数  : uchar8 col       显示的横坐标0~122
+             uchar8 row       页范围0～7
+             uchar8 str[]  显示的字符串
  输出参数  : NONE
  返 回 值  : NONE
 *****************************************************************************/
-void OLED_P6x8Str(uchar8 ucIdxX, uchar8 ucIdxY, uchar8 ucDataStr[])
+void OLED_P6x8Str(uchar8 col, uchar8 row, uchar8 str[])
 {
-    uchar8 i, j, ucDataTmp;
+    uchar8 i;
 
-    for (j = 0; ucDataStr[j] != '\0'; j++)
-    {
-        ucDataTmp = ucDataStr[j] - 32;
-        if(ucIdxX > 122)
-        {
-            ucIdxX = 0;
-            ucIdxY++;
-        }
-
-        OLED_SetPos(ucIdxX,ucIdxY);
-
-        for(i = 0; i < 6; i++)
-        {
-            OLED_WrDat(Font_6x8[ucDataTmp][i]);
-        }
-        ucIdxX += 6;
-    }
-
-    return;
+    for (i = 0; str[i] != '\0'; i++, col += 6)
+        OLED_P6x8Char(col, row, str[i]);
 }
 
-/*****************************************************************************
+/*************************************************************
+ 函 数 名  : OLED_P8x16Char
+ 功能描述  : 显示一个8x16标准ASCII字符
+ 输入参数  : uchar8 col col 显示的横坐标0~120
+             uchar8 row row 页范围0～6
+             uchar8 data    显示的字符
+ 输出参数  : NONE
+ 返 回 值  : NONE
+*************************************************************/
+void OLED_P8x16Char(uchar8 col, uchar8 row, uchar8 data)
+{
+    static const uchar col_per_char = 8;
+    static const uchar max_col = 120;
+    static const uchar max_row = 6;
+    uchar8 i, font_inx;
+
+    while ( col > max_col ){
+        col -= max_col;
+        row += 2;
+    }
+    if ( row > max_row )
+        return;
+
+    /* valid character starts from ' '(32) in ASCII */
+    font_inx = data - ' ';
+
+    OLED_SetPos(col, row);
+    for(i = 0; i < col_per_char; i++)
+        OLED_WrDat(Font_8x16[font_inx << 4 + i]);
+
+    OLED_SetPos(col, ++row);
+    for(i = 0; i < col_per_char; i++)
+        OLED_WrDat(Font_8x16[font_inx << 4 + i + 8]);
+}
+
+/*************************************************************
  函 数 名  : OLED_P8x16Str
  功能描述  : 写入一组8x16标准ASCII字符串
- 输入参数  : uchar8 ucIdxX       为显示的横坐标0~120
-             uchar8 ucIdxY       为页范围0～3
-             uchar8 ucDataStr[]  要显示的字符串
+ 输入参数  : uchar8 col       为显示的横坐标0~120
+             uchar8 row       为页范围0～3
+             uchar8 str[]  要显示的字符串
  输出参数  : NONE
  返 回 值  : NONE
-*****************************************************************************/
-void OLED_P8x16Str(uchar8 ucIdxX, uchar8 ucIdxY, uchar8 ucDataStr[])
+*************************************************************/
+void OLED_P8x16Str(uchar8 col, uchar8 row, uchar8 str[])
 {
-    unsigned int i, j, ucDataTmp;
+    uchar i;
 
-    ucIdxY <<= 1;
+    row <<= 1;  // 2 rows per character
 
-    for (j = 0; ucDataStr[j] != '\0'; j++)
-    {
-        ucDataTmp = ucDataStr[j] - 32;
-        if(ucIdxX > 120)
-        {
-            ucIdxX = 0;
-            ucIdxY += 2;
-        }
-        OLED_SetPos(ucIdxX, ucIdxY);
-
-        for(i = 0; i < 8; i++)
-        {
-            OLED_WrDat(Font_8x16[(ucDataTmp << 4) + i]);
-        }
-
-        OLED_SetPos(ucIdxX, ucIdxY + 1);
-
-        for(i = 0; i < 8; i++)
-        {
-            OLED_WrDat(Font_8x16[(ucDataTmp << 4) + i + 8]);
-        }
-        ucIdxX += 8;
-
-    }
-
-    return;
-}
-
-// the input char array must be end up with '\0'.
-int str2int(char *str)
-{
-    int result = 0;
-    int index = 0;
-    int unit = 0;
-
-    if (str == NULL)
-	Error("Invalid input in function str2int");
-    for (index=0; str[index]!='\0'; index++){
-	if ((str[index] < 48) || (str[index] > 57))
-	    Error("Invalid input in function str2int");
-	result = result * 10 + str[index] - 48;
-    }
-
-    return result;
-}
-
-void usage(char *name)
-{
-    printf("Usage:\n");
-    printf("  %s init\n", name);
-    printf("  %s clear\n", name);
-    printf("  %s clear <row>\n", name);
-    printf("  %s print <row> <col> <string>\n", name);
-    printf("eg:\n");
-    printf("  %s display 2 0 Yakoo\n", name);
-    printf("PS: row is 0~3\n");
-    printf("PS: col  is 0~120\n");
-}
-
-int main(int argc, char **argv)
-{
-    uint cmd = 0, oled_cmd = 0, oled_arg = 0;
-    int row = -1;
-    int col = -1;
-    char *str;
-    int light = 0;
-    int i = 0;
-
-    DEBUG_INFO("argc: %d\n", argc);
-    for (i=0; i<argc; i++)
-        DEBUG_INFO("argv[%d]: %s\n", i, argv[i]);
-    
-    // check arguments
-    if ((argc == 2) && !strcmp(argv[1], "init"))
-        cmd = 1;
-    if ((argc == 3) && !strcmp(argv[1], "init")){
-        cmd = 1;
-        light = str2int(argv[2]);
-        DEBUG_INFO("light: %d\n", light);
-        light &= 0x01;
-    }
-    if ((argc == 2) && !strcmp(argv[1], "clear"))
-        cmd = 20; 
-    if ((argc == 3) && !strcmp(argv[1], "clear")){
-        cmd = 21;
-        row = str2int(argv[2]);
-        DEBUG_INFO("row: %d\n", row);
-        if (row < 0 || row > 3){
-            printf("Invalid row, valid row is 0~3.\n");
-            return -1;
-        }
-    }
-    if ((argc == 5) && !strcmp(argv[1], "print")){
-        cmd = 3;
-        row = str2int(argv[2]);
-        col = str2int(argv[3]);
-        DEBUG_INFO("row: %d, col: %d\n", row, col);
-        str = argv[4];
-        if (row < 0 || row > 7){
-            printf("Invalid row, valid row is 0~7.\n");
-            return -1;
-        }
-        if (col< 0 || col > 120){
-            printf("Invalid column, valid column is 0~120.\n");
-            return -1;
-        }
-    }
-    if (!cmd){
-        usage(argv[0]);
-        return -1;
-    }
-
-    fd = open(OLED_DEVICE_PATH, O_RDWR);
-    if(fd < 0){
-        printf("Can't open device: " OLED_DEVICE_PATH "\n");
-        return -1;
-    }
-
-    switch (cmd){
-    case 1 : // initial OLED
-        oled_cmd = OLED_CMD_INIT;
-        oled_arg = light;
-        break;
-    case 20:	// clear screen
-        oled_cmd = OLED_CMD_CLR_ALL;
-        oled_arg = 0;
-        break;
-    case 21:	// clear 1 row
-        oled_cmd = OLED_CMD_CLEAR_ROW;
-        oled_arg = row;
-        break;
-    case 3 :	// print a string 
-        DEBUG_INFO("Prepare to print string, row: %d, col: %d, str: %s\n", row, col, str);
-        OLED_P6x8Str(col, row, str);
-	break;
-    default:
-        printf("Invalid command!");
-        break;
-    }
-
-    if (oled_cmd && oled_arg)
-        ioctl(fd, oled_cmd, oled_arg);
-
-    close(fd);
-
-    return 0;
+    for (i = 0; str[i] != '\0'; i++, col += 8)
+        OLED_P8x16Char(col, row, str[i]);
 }
 
 const unsigned char Font_6x8[][6] =
@@ -451,3 +368,4 @@ const unsigned char Font_8x16[]=
     0x00,0x02,0x02,0x7C,0x80,0x00,0x00,0x00,0x00,0x40,0x40,0x3F,0x00,0x00,0x00,0x00,//}93
     0x00,0x06,0x01,0x01,0x02,0x02,0x04,0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,//~94
 };
+

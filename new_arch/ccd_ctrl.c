@@ -9,28 +9,17 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
+#include "ccd_ctrl.h"
+#include "adc_ctrl.h"
+#include "oled_ctrl.h"
 #include "fftw3.h"
-#include "common.h"
-#include "oled.h"
-
-#define DEFAULT_REPEATE_TIME    500
-
-#define CCD_DEV_NAME        "/dev/linear-ccd"
-#define CCD_MAX_PIXEL_CNT   1024
-/* masking useless pixel data from left and right edge */
-/* must be less than (CCD_MAX_PIXEL_CNT - OLED_WIDTH) / 2 = 448 */ 
-#define CCD_EDGE_MASK       130
-#define CCD_RESOLUTION      10
-#define CCD_MAX_PIXEL_VAL   (1 << CCD_RESOLUTION)
-#define CCD_COMPRESS_RATE   (CCD_MAX_PIXEL_VAL / OLED_HEIGHT )
-
 
 #define ONCE 1
 #define NONE 0
 
 #define N 1024      			// fft-length
 #define G 256     			// gary 0-255
-#define N_part (N-CCD_EDGE_MASK)
+#define N_part (N - CCD_EDGE_MASK)
 
 #define lg 18   			//highpass filter length
 #define var 43  			//the count-weft value
@@ -65,70 +54,87 @@ void fft(void);
 void hfliter(void);
 void ifft(void);
 
-void OLED_SetPos(int fd_oled, uchar x, uchar y)
+#define BAT_IMAGE_WIDTH     (BATTERY_LEVEL_NUM + 4)
+#define BATTERY_LEVEL_NUM   7   // 0 ~ 6
+#define BAT_IMG_BLANK_INX   0
+#define BAT_IMG_HEAD_INX    1 
+#define BAT_IMG_FULL_INX    2 
+#define BAT_IMG_VOL_INX     3
+/*                        blank head  full  vol */
+static const vol_image[] = { 0, 0x1c, 0x7f, 0x41 };
+
+void print_voltage(int vol_lev)
 {
-    ioctl(fd_oled, OLED_CMD_SET_POS, x | (y << 8));
+    int i = 0, col = 0;
+    char bits; 
+
+    for (i = 0; i < BAT_IMAGE_WIDTH; i++){
+        OLED_SetPos(OLED_COL_NUM - BAT_IMAGE_WIDTH + i, 0);
+
+        switch (i)
+        {
+          case 0:
+            bits = vol_image[BAT_IMG_BLANK_INX];
+            break;
+          case 1:
+            bits = vol_image[BAT_IMG_HEAD_INX];
+            break;
+          case 2:
+          case (BAT_IMAGE_WIDTH - 1):
+            bits = vol_image[BAT_IMG_FULL_INX];
+            break;
+
+          default:
+            bits = (BATTERY_LEVEL_NUM - (i - 2)) > vol_lev ? vol_image[BAT_IMG_VOL_INX] : vol_image[BAT_IMG_FULL_INX];
+            break;
+        }
+
+        OLED_WrDat(bits);
+    }
 }
 
-void OLED_WrDat(int fd_oled, uchar data)
+void print_line(int line)
 {
-    ioctl(fd_oled, OLED_CMD_WR_DAT, data);
+    char line_str[1024] = " lines: ";
+    char num_str[20] = {0};
+
+    sprintf(num_str, "%d", line);
+    strcat(line_str, num_str);
+
+    /* hard code, TBD */
+    OLED_P6x8Str(5 * 6, 0, line_str);
 }
 
-void OLED_WrCmd(int fd_oled, uchar cmd)
+void print_ccd_data(unsigned int * pixels)
 {
-    ioctl(fd_oled, OLED_CMD_WR_CMD, cmd);
-}
-
-void print_page_on_screen(unsigned int * pixels, unsigned int buf_len)
-{
-    int fd_oled;
-    uint col = 0, row = 0, i = 0;
+    unsigned int col = 0, row = 0, i = 0;
     float sresult = 0.0;
-    char oledcmd[1024] = "./oled print 0 0 \" WDD  lines: ";
-    char numstr[20] = {0};
+    char bits_pattern[OLED_BYTES_NUM] = {0};  // 7 * 128
+    unsigned int threshold_row = 0;
 
     /* pixel number for each sector */
-    const uint pns = (buf_len - CCD_EDGE_MASK * 2) / OLED_WIDTH;
+    static const uint pns = (CCD_MAX_PIXEL_CNT - CCD_EDGE_MASK * 2) / OLED_COL_NUM;
 
     /* average of pixel values in one sector */
     uint aop = 0;
 
-    fd_oled = open(OLED_DEVICE_PATH, O_RDWR);
-    if(fd_oled < 0)
-        Error("Can't open device: " OLED_DEVICE_PATH "\n");
-
-    ioctl(fd_oled, OLED_CMD_INIT, 0);
-
-    for (col = 0; col < OLED_WIDTH ; col++){
+    for (col = 0; col < OLED_COL_NUM ; col++){
         aop = 0;
         for (i = 0; i < pns; i++)
             aop += pixels[CCD_EDGE_MASK + col * pns  + i];
 
         /* count pixels average value and compress */
         aop = aop / pns / CCD_COMPRESS_RATE;    
+        threshold_row = OLED_ROW_NUM - (aop / OLED_ROW_NUM) - 1;
 
-        /* print each column on CCD */
-        for (row = 1; row < (aop / OLED_ROW_NUM); row++){
-            /* reserve 1 row to show title */
-            OLED_SetPos(fd_oled, col, OLED_ROW_NUM - row - 1 + 1);
-            OLED_WrDat(fd_oled, 0xff);
-        }
-        /* reserve 1 row to show title */
-        OLED_SetPos(fd_oled, col, OLED_ROW_NUM - row - 1 + 1);
-        OLED_WrDat( fd_oled, (0xff00 >> (aop % OLED_ROW_NUM)) & 0xff );
+        for (row = 0; row < threshold_row; row++)
+            OLED_WrBits(col, row + CCD_BOTTOM_MASK, 0);
+
+        OLED_WrBits(col, threshold_row + CCD_BOTTOM_MASK, ( 0xff00 >> (aop % OLED_ROW_NUM) ) & 0xff);
+
+        for (row = threshold_row + 1; row < OLED_ROW_NUM; row++)
+            OLED_WrBits(col, row + CCD_BOTTOM_MASK, 0xff);
     }
-
-    sample_process(pixels);
-    sprintf(numstr, "%d", line);
-    strcat(oledcmd, numstr);
-    strcat(oledcmd, "\" &");
-    system( oledcmd );
-
-    DEBUG_NUM(line);
-    
-
-    close(fd_oled);
 }
 
 float sample_process(unsigned int *pixels)
@@ -462,8 +468,8 @@ void count(unsigned char c[N])
 
 int main (int argc, char ** argv)
 {
-    int fd_ccd, i, ret = 0;
-    unsigned int repeate = 1;
+    int fd_ccd = -1, i = 0, ret = 0, vol_lev = 0;
+    unsigned int repeate = 1, line_tmp = 0;
     unsigned int pixels[CCD_MAX_PIXEL_CNT];
     const unsigned int buffer_len = sizeof(pixels);
 
@@ -476,24 +482,33 @@ int main (int argc, char ** argv)
 
     printf("Test program for S10077 LINEAR CCD Driver\n");
 
+    /* hard code, TBD */
+    OLED_P6x8Str(0, 0, " WDD ");
+
+    vol_lev = process_adc();
+    print_voltage(vol_lev);
 
     fd_ccd = open(CCD_DEV_NAME, O_RDONLY);
     if (fd_ccd < 0)
         Error("Failed to open device: " CCD_DEV_NAME "!\n");
 
+    line_tmp = 0;
     for (i = 0; i < repeate; i++){
         printf("\nTrying to get image data for the %d th time.\n", i + 1);
 
         /* do read ccd */
         ret = read(fd_ccd, pixels, buffer_len);
 
-        /* print data on oled screen */
-        print_page_on_screen(pixels, CCD_MAX_PIXEL_CNT);
+        sample_process(pixels);
 
-        system("./adc &");
+        line_tmp += line;
 
+        /* fresh ccd data on oled screen */
+        print_ccd_data(pixels);
         usleep(300000);
     }
+
+    print_line(line_tmp / repeate);
 
     close(fd_ccd);
 

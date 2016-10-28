@@ -60,11 +60,11 @@ int main(void)
                     break;
                 case 0x82:
                     system("pkill ccd");
-                    system("./ccd 16 &");
+                    system("./ccd 10 &");
                     break;
                 case 0x83:
                     system("pkill ccd");
-                    system("./ccd 50 &");
+                    system("./ccd 20 &");
                     break;
                 case 0x84:
                     system("pkill ccd");

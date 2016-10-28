@@ -27,7 +27,9 @@ static struct class *class;
 static const int spi_oled_res = OLED_PIN_RES;
 static const int spi_oled_dc = OLED_PIN_DC;
 static struct spi_device *spi_oled_dev;
-static uchar8 *ker_buf;
+static unsigned char *ker_buf;
+static unsigned char ROW = 0;
+static unsigned char COL = 0;
 
 void OLED_WrDat(uchar8 data)
 {
@@ -183,6 +185,8 @@ void SetVCOMH(uchar8 ucData)
 
 void OLED_SetPos(uchar8 ucIdxX, uchar8 ucIdxY)
 {
+    COL = ucIdxX;
+    ROW = ucIdxY;
     OLED_WrCmd(0xb0 + ucIdxY);
     OLED_WrCmd(((ucIdxX & 0xf0) >> 4) | 0x10);
     OLED_WrCmd( (ucIdxX & 0x0f) | 0x00);
@@ -205,7 +209,6 @@ void OLED_ClearPage(uchar8 ucPage)
 void OLED_Fill(uchar8 ucData)
 {
     unsigned int ucPage,ucColumn;
-    DEBUG_NUM(ucData);
 
     for(ucPage = 0; ucPage < 8; ucPage++)
     {
@@ -299,21 +302,36 @@ static long oled_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     return 0;
 }
 
-static ssize_t oled_write(struct file *file, const uchar8 __user *buf, size_t count, loff_t *ppos)
+static ssize_t oled_write(struct file *file, const uchar8 __user *buf, size_t length, loff_t *ppos)
 {
-    int err;
+    int err, i;
+    unsigned char col = COL, row = ROW;
 
-    if (count > 4096)
+    if (length > 4096)
         return -EINVAL;
 
-    err = copy_from_user(ker_buf, buf, count);
+    err = copy_from_user(ker_buf, buf, length);
     if(err){
         printk(KERN_ERR "Failed to copy data from user!");
         return err;
     }
 
-    spi_write(spi_oled_dev, buf,count);
-    return 0;
+    for (i = 0; i < length; i++){
+        OLED_SetPos(col, row);
+        OLED_WrDat(ker_buf[i]);
+
+        if ( col < (OLED_WIDTH - 1) )
+            col++;
+        else
+            if (row < (OLED_ROW_NUM - 1)){
+                row++;
+                col = 0;
+            } 
+            else 
+                return i + 1;
+    }
+
+    return length;
 }
 
 

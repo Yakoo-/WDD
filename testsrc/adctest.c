@@ -38,12 +38,6 @@ void OLED_WrCmd(int fd_oled, uchar cmd)
     ioctl(fd_oled, OLED_CMD_WR_CMD, cmd);
 }
 
-void Error(char * errinfo)
-{
-    printf("Deadly error occured, error info: %s\n", errinfo);
-    exit(1);
-}
-
 void usage(void)
 {
     fprintf(stderr, "Usage:adctest <auto/times>\n");
