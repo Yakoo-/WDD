@@ -1,9 +1,5 @@
 To Do:
-WDD-5, connect network pins of core board to net ports
-WDD-6, compile ssh, scp using arm-linux-gcc 
 WDD-8, storage CCD data
-WDD-10, built a WIFI-to-UART interface board
-WDD-14, restore buadrate to 115200
 
 In Progress:
 
@@ -16,3 +12,4 @@ WDD-9, fix lithium battery inside the plastic shell
 WDD-13, Add LED control pin, light LED before start CCD
 WDD-11, figuring out how to focusing our CCD sensor
 WDD-12, optimize CCD data acquisition process, adjust timing diagram of ccd start signal
+WDD-5, connect network pins of core board to net ports
