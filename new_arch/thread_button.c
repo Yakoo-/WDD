@@ -12,7 +12,7 @@
 
 #include "common.h"
 #include "main.h"
-#include "button_ctrl.h"
+#include "thread_button.h"
 
 static int fd_button = -1;
 

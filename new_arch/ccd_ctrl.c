@@ -13,13 +13,14 @@
 #include "ccd_ctrl.h"
 #include "adc_ctrl.h"
 #include "oled_ctrl.h"
-#include "button_ctrl.h"
+#include "thread_button.h"
 #include "main.h"
 #include "fftw3.h"
 
 
 pthread_mutex_t repeate_lock;
 pthread_cond_t  repeate_cond;
+pthread_mutex_t oled_lock;
 unsigned int repeate; 
 
 
@@ -500,6 +501,10 @@ int main (int argc, char ** argv)
             repeate = DEFAULT_REPEATE_TIME;
         else
             repeate = atoi(argv[1]);
+
+
+    pthread_mutex_init(&oled_lock, NULL);  
+    pthread_mutex_init(&repeate_lock, NULL);  
 
     /* hard code, TBD */
     OLED_P6x8Str(0, 0, " WDD ");

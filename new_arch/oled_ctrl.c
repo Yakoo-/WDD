@@ -4,6 +4,7 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 
+#include "main.h"
 #include "common.h"
 #include "oled.h"
 #include "oled_ctrl.h"
@@ -12,6 +13,8 @@ static int fd_oled = -1;
 
 void OLED_Init()
 {
+    pthread_mutex_lock( &oled_lock );
+
     if (fd_oled < 0)
         fd_oled = open(OLED_DEVICE_PATH, O_WRONLY);
 
@@ -21,6 +24,8 @@ void OLED_Init()
     }
 
     ioctl(fd_oled, OLED_CMD_INIT, 0);
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_SetPos(uchar col, uchar row)
@@ -28,7 +33,11 @@ void OLED_SetPos(uchar col, uchar row)
     if (fd_oled < 0)
         OLED_Init();
 
+    pthread_mutex_lock( &oled_lock );
+
     ioctl(fd_oled, OLED_CMD_SET_POS, col | (row << 8));
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_WrDat(uchar data)
@@ -36,7 +45,11 @@ void OLED_WrDat(uchar data)
     if (fd_oled < 0)
         OLED_Init();
 
+    pthread_mutex_lock( &oled_lock );
+
     ioctl(fd_oled, OLED_CMD_WR_DAT, data);
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_WrCmd(uchar cmd)
@@ -44,7 +57,11 @@ void OLED_WrCmd(uchar cmd)
     if (fd_oled < 0)
         OLED_Init();
 
+    pthread_mutex_lock( &oled_lock );
+
     ioctl(fd_oled, OLED_CMD_WR_CMD, cmd);
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_WrBits(uchar col, uchar row, uchar bits)
@@ -71,7 +88,12 @@ void OLED_PrintPattern(uchar8 col, uchar8 row, uchar8 *pattern, uint length)
         OLED_Init();
 
     OLED_SetPos(col, row);
+
+    pthread_mutex_lock( &oled_lock );
+    
     write(fd_oled, pattern, length);
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 /*****************************************************************************
