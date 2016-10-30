@@ -160,7 +160,6 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START ].pin, 1);
 
     get_fiq_regs(&regs);
-    DEBUG_INFO("status: %d"  ,*(unsigned int *)regs.uregs[reg_args]);
 
     if (fiq_arg->status != FIQ_STATUS_FINISHED){
         if (regs.uregs[reg_index] != 0x03ff0009){

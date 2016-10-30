@@ -13,9 +13,14 @@
 #include "adc_ctrl.h"
 #include "oled.h"
 
+static int fd_adc = -1;
+
 int process_adc(void)
 {
-    int adc_value = get_adc_value( WDD_ADC_CHANNEL );
+    if (adc_init(WDD_ADC_CHANNEL) < 0)
+        return -1;
+
+    int adc_value = get_adc_value();
     float voltage = get_voltage( adc_value );
 
     return get_vol_level(voltage);
@@ -48,38 +53,41 @@ inline float get_voltage(int adc_value)
     return 3.3 * adc_value / 4095 / RDVI + ADC_AVERAGE_ERROR;
 }
 
-int get_adc_value(int channel)
+int get_adc_value(void)
 {
-    int fd = 0, j = 0, err = 0;
-    int adc_value = 0, len = 0, tmp = 0;
-    char buffer[30] = {0};
+    int i = 0, adc_value = 0, tmp = 0;
 
-    fd = open(ADC_DEVICE_PATH, O_RDONLY);
-    if (fd < 0){
+    for (i = 0; i < N_TIMES_AVERAGE; i++){
+        read(fd_adc, &tmp, sizeof(tmp));
+
+        if (tmp > 0)
+            adc_value += tmp;
+        else
+            DEBUG_INFO("Failed to read ADC value!");
+
+        usleep(100000);
+    }
+
+    return adc_value / N_TIMES_AVERAGE;
+}
+
+int adc_init(int channel)
+{
+    int err;
+    if (fd_adc < 0)
+        fd_adc = open(ADC_DEVICE_PATH, O_RDONLY);
+
+    if (fd_adc < 0){
         DEBUG_INFO("Failed to open ADC device!\n");
         return -1;
     }
 
-    err = ioctl(fd, ADC_CMD_SELMUX, channel);
+    err = ioctl(fd_adc, ADC_CMD_SELMUX, channel);
     if (err){
         DEBUG_INFO("Failed to set ADC channel!");
-        close(fd);
+        close(fd_adc);
         return -1;
     }
 
-    for (j = 0; j < N_TIMES_AVERAGE; j++){
-        len = read(fd, buffer, sizeof(buffer) - 1);
-
-        if (len > 0){
-            buffer[len] = '\0';
-            sscanf(buffer, "%d", &tmp);
-            adc_value += tmp;
-        }else{
-            DEBUG_INFO("Failed to read ADC value!\n");
-        }
-        usleep(100000);
-    }
-    close(fd);
-
-    return adc_value / N_TIMES_AVERAGE;
+    return 0;
 }

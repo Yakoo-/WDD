@@ -1,5 +1,4 @@
-#ifndef _CCD_CTRL_H_
-#define _CCD_CTRL_H_
+#pragma once
 
 #include "common.h"
 #include "oled.h"
@@ -16,5 +15,3 @@
 #define CCD_RESOLUTION      10
 #define CCD_MAX_PIXEL_VAL   (1 << CCD_RESOLUTION)
 #define CCD_COMPRESS_RATE   (CCD_MAX_PIXEL_VAL / OLED_HEIGHT )
-
-#endif

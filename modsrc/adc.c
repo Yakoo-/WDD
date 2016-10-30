@@ -18,6 +18,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
+#include "common.h"
 
 #define DEVICE_NAME    "adc"
 
@@ -90,32 +91,19 @@ static irqreturn_t adc_int_handler(int irq, void *dev_id)
 
 static ssize_t adc_read(struct file *flip, char __user *buffer, size_t count, loff_t *ppos)
 {
-    char str[20];
-    int value;
-    size_t len;
-
     if (down_trylock(&ADC_LOCK) == 0){
         ADC_enable = 1;
         START_ADC(adcdev.channel, adcdev.prescale);
         wait_event_interruptible(adcdev.wait, ev_adc);
-        ev_adc = 0;
 
-        printk(KERN_DEBUG "COM2416 ADC Driver: AIN[%d] = 0x%04x, %d\n", adcdev.channel, adc_data, adc_data);
-        value = adc_data;
-        sprintf(str, "%d", adc_data);
+        ev_adc = 0;
         ADC_enable = 0;
         up(&ADC_LOCK);
     }else{
-        value = -1;
+        adc_data = -1;
     }
 
-    len = sprintf(str, "%d", value);
-    if (count >= len){
-        int r = copy_to_user(buffer, str, len);
-        return r ? r : len;
-    }else{
-        return -EINVAL;
-    }
+    return copy_to_user(buffer, (char *)&adc_data, sizeof(adc_data));
 }
 
 static long adc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
 
 #include "common.h"
 #include "oled.h"
@@ -11,21 +12,15 @@ static int fd_oled = -1;
 
 void OLED_Init()
 {
-    fd_oled = open(OLED_DEVICE_PATH, O_WRONLY);
+    if (fd_oled < 0)
+        fd_oled = open(OLED_DEVICE_PATH, O_WRONLY);
+
     if(fd_oled < 0){
         printf("Can't open device: " OLED_DEVICE_PATH "\n");
         return;
     }
 
     ioctl(fd_oled, OLED_CMD_INIT, 0);
-}
-
-void OLED_WrBits(uchar col, uchar row, uchar bits)
-{
-    if (col < OLED_COL_NUM && row < OLED_ROW_NUM){
-        OLED_SetPos(col, row);
-        OLED_WrDat(bits);
-    }
 }
 
 void OLED_SetPos(uchar col, uchar row)
@@ -50,6 +45,14 @@ void OLED_WrCmd(uchar cmd)
         OLED_Init();
 
     ioctl(fd_oled, OLED_CMD_WR_CMD, cmd);
+}
+
+void OLED_WrBits(uchar col, uchar row, uchar bits)
+{
+    if (col < OLED_COL_NUM && row < OLED_ROW_NUM){
+        OLED_SetPos(col, row);
+        OLED_WrDat(bits);
+    }
 }
 
 /*****************************************************************************

@@ -8,11 +8,20 @@
 #include <fcntl.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <pthread.h>
 
 #include "ccd_ctrl.h"
 #include "adc_ctrl.h"
 #include "oled_ctrl.h"
+#include "button_ctrl.h"
+#include "main.h"
 #include "fftw3.h"
+
+
+pthread_mutex_t repeate_lock;
+pthread_cond_t  repeate_cond;
+unsigned int repeate; 
+
 
 #define ONCE 1
 #define NONE 0
@@ -63,39 +72,43 @@ void ifft(void);
 /*                        blank head  full  vol */
 static const vol_image[] = { 0, 0x1c, 0x7f, 0x41 };
 
-void print_voltage(int vol_lev)
+void fresh_battery(void)
 {
     int i = 0, col = 0;
     char bits; 
 
-    for (i = 0; i < BAT_IMAGE_WIDTH; i++){
-        OLED_SetPos(OLED_COL_NUM - BAT_IMAGE_WIDTH + i, 0);
+    while(1){
+        int vol_lev = process_adc();
 
-        switch (i)
-        {
-          case 0:
-            bits = vol_image[BAT_IMG_BLANK_INX];
-            break;
-          case 1:
-            bits = vol_image[BAT_IMG_HEAD_INX];
-            break;
-          case 2:
-          case (BAT_IMAGE_WIDTH - 1):
-            bits = vol_image[BAT_IMG_FULL_INX];
-            break;
+        /* print battery image on screen */
+        for (i = 0; i < BAT_IMAGE_WIDTH; i++){
+            switch (i) {
+            case 0:
+                bits = vol_image[BAT_IMG_BLANK_INX];
+                break;
+            case 1:
+                bits = vol_image[BAT_IMG_HEAD_INX];
+                break;
+            case 2:
+            case (BAT_IMAGE_WIDTH - 1):
+                bits = vol_image[BAT_IMG_FULL_INX];
+                break;
 
-          default:
-            bits = (BATTERY_LEVEL_NUM - (i - 2)) > vol_lev ? vol_image[BAT_IMG_VOL_INX] : vol_image[BAT_IMG_FULL_INX];
-            break;
+            default:
+                bits = (BATTERY_LEVEL_NUM - (i - 2)) > vol_lev ? vol_image[BAT_IMG_VOL_INX] : vol_image[BAT_IMG_FULL_INX];
+                break;
+            }
+
+            OLED_WrBits(OLED_COL_NUM - BAT_IMAGE_WIDTH + i, 0, bits);
         }
-
-        OLED_WrDat(bits);
+        DEBUG_NUM(vol_lev);
+        sleep(30);
     }
 }
 
 void print_line(int line)
 {
-    char line_str[1024] = " lines: ";
+    char line_str[20] = " lines: ";
     char num_str[20] = {0};
 
     sprintf(num_str, "%d", line);
@@ -104,6 +117,13 @@ void print_line(int line)
     /* hard code, TBD */
     OLED_P6x8Str(5 * 6, 0, line_str);
 }
+
+void clear_line(void)
+{
+    char line_str[20] = "           ";
+    OLED_P6x8Str(5 * 6, 0, line_str);
+}
+
 
 void print_ccd_data(unsigned int * pixels)
 {
@@ -469,9 +489,10 @@ void count(unsigned char c[N])
 int main (int argc, char ** argv)
 {
     int fd_ccd = -1, i = 0, ret = 0, vol_lev = 0;
-    unsigned int repeate = 1, line_tmp = 0;
     unsigned int pixels[CCD_MAX_PIXEL_CNT];
     const unsigned int buffer_len = sizeof(pixels);
+    pthread_t ppid_button;
+    pthread_t ppid_voltage;
 
     /* process input value */
     if (argc == 2)
@@ -480,37 +501,44 @@ int main (int argc, char ** argv)
         else
             repeate = atoi(argv[1]);
 
-    printf("Test program for S10077 LINEAR CCD Driver\n");
-
     /* hard code, TBD */
     OLED_P6x8Str(0, 0, " WDD ");
 
-    vol_lev = process_adc();
-    print_voltage(vol_lev);
+    ret = pthread_create(&ppid_button, NULL, (void *)select_button, NULL);
+    if (ret != 0)
+        Error("Failed to create button select thread!");
+
+    ret = pthread_create(&ppid_voltage, NULL, (void *)fresh_battery, NULL);
+    if (ret != 0)
+        Error("Failed to create button select thread!");
 
     fd_ccd = open(CCD_DEV_NAME, O_RDONLY);
     if (fd_ccd < 0)
         Error("Failed to open device: " CCD_DEV_NAME "!\n");
 
-    line_tmp = 0;
-    for (i = 0; i < repeate; i++){
-        printf("\nTrying to get image data for the %d th time.\n", i + 1);
+    while (1){
+        pthread_mutex_lock( &repeate_lock );
+        while (repeate == 0)
+            pthread_cond_wait( &repeate_cond, &repeate_lock );
 
-        /* do read ccd */
-        ret = read(fd_ccd, pixels, buffer_len);
+        clear_line();
+        unsigned int line_tmp = 0;
+        for (i = 0; i < repeate; i++){
 
-        sample_process(pixels);
+            ret = read(fd_ccd, pixels, buffer_len);
 
-        line_tmp += line;
+            sample_process(pixels);
 
-        /* fresh ccd data on oled screen */
-        print_ccd_data(pixels);
-        usleep(300000);
+            line_tmp += line;
+
+            /* fresh ccd data on oled screen */
+            print_ccd_data(pixels);
+            usleep(300000);
+        }
+        print_line(line_tmp / repeate);
+
+        repeate = 0;
+        pthread_mutex_unlock( &repeate_lock );
     }
-
-    print_line(line_tmp / repeate);
-
-    close(fd_ccd);
-
     return 0;
 }

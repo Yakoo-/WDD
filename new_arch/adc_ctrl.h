@@ -11,11 +11,12 @@
 #define RDVI    (R2 / (R1 + R2))
 #define ADC_AVERAGE_ERROR       0.04
 #define DEFAULT_REPEATE_TIME    500
-#define N_TIMES_AVERAGE         4
+#define N_TIMES_AVERAGE         2
 
-int   get_adc_value(int channel);
+int adc_init(int channel);
+int get_adc_value(void);
+int get_vol_level(float voltage);
+int process_adc(void);
 inline float get_voltage(int adc_value);
-int   get_vol_level(float voltage);
-int   process_adc(void);
 
 #endif
