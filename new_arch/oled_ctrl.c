@@ -2,19 +2,24 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <pthread.h>
 
-#include "main.h"
-#include "common.h"
-#include "oled.h"
 #include "oled_ctrl.h"
 
 static int fd_oled = -1;
+pthread_mutex_t oled_lock;
+
+inline void acquire_oled(void)
+{
+    pthread_mutex_lock( &oled_lock );
+}
+
+inline void release_oled(void)
+{
+    pthread_mutex_unlock( &oled_lock );
+}
 
 void OLED_Init()
 {
-    pthread_mutex_lock( &oled_lock );
-
     if (fd_oled < 0)
         fd_oled = open(OLED_DEVICE_PATH, O_WRONLY);
 
@@ -24,8 +29,6 @@ void OLED_Init()
     }
 
     ioctl(fd_oled, OLED_CMD_INIT, 0);
-
-    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_SetPos(uchar col, uchar row)
@@ -33,11 +36,7 @@ void OLED_SetPos(uchar col, uchar row)
     if (fd_oled < 0)
         OLED_Init();
 
-    pthread_mutex_lock( &oled_lock );
-
     ioctl(fd_oled, OLED_CMD_SET_POS, col | (row << 8));
-
-    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_WrDat(uchar data)
@@ -45,11 +44,7 @@ void OLED_WrDat(uchar data)
     if (fd_oled < 0)
         OLED_Init();
 
-    pthread_mutex_lock( &oled_lock );
-
     ioctl(fd_oled, OLED_CMD_WR_DAT, data);
-
-    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_WrCmd(uchar cmd)
@@ -57,19 +52,19 @@ void OLED_WrCmd(uchar cmd)
     if (fd_oled < 0)
         OLED_Init();
 
-    pthread_mutex_lock( &oled_lock );
-
     ioctl(fd_oled, OLED_CMD_WR_CMD, cmd);
-
-    pthread_mutex_unlock( &oled_lock );
 }
 
 void OLED_WrBits(uchar col, uchar row, uchar bits)
 {
+    pthread_mutex_lock( &oled_lock );
+
     if (col < OLED_COL_NUM && row < OLED_ROW_NUM){
         OLED_SetPos(col, row);
         OLED_WrDat(bits);
     }
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 /*****************************************************************************
@@ -84,19 +79,19 @@ void OLED_WrBits(uchar col, uchar row, uchar bits)
 *****************************************************************************/
 void OLED_PrintPattern(uchar8 col, uchar8 row, uchar8 *pattern, uint length)
 {
+    pthread_mutex_lock( &oled_lock );
+    
     if (fd_oled < 0)
         OLED_Init();
 
     OLED_SetPos(col, row);
 
-    pthread_mutex_lock( &oled_lock );
-    
     write(fd_oled, pattern, length);
 
     pthread_mutex_unlock( &oled_lock );
 }
 
-/*****************************************************************************
+/*************************************************************
  函 数 名  : OLED_P6x8Char
  功能描述  : 显示一个6x8标准ASCII字符
  输入参数  : uchar8 col col 显示的横坐标0~122
@@ -104,7 +99,7 @@ void OLED_PrintPattern(uchar8 col, uchar8 row, uchar8 *pattern, uint length)
              uchar8 data    显示的字符
  输出参数  : NONE
  返 回 值  : NONE
-*****************************************************************************/
+*************************************************************/
 void OLED_P6x8Char(uchar8 col, uchar8 row, uchar8 data)
 {
     static const uchar col_per_char = 6;
@@ -122,13 +117,17 @@ void OLED_P6x8Char(uchar8 col, uchar8 row, uchar8 data)
     /* valid character starts from ' '(32) in ASCII */
     font_inx = data - ' ';
 
+    pthread_mutex_lock( &oled_lock );
+
     OLED_SetPos(col, row);
     for(i = 0; i < col_per_char; i++)
         OLED_WrDat(Font_6x8[font_inx][i]);
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 
-/*****************************************************************************
+/*************************************************************
  函 数 名  : OLED_P6x8Str
  功能描述  : 写入一组6x8标准ASCII字符串
  输入参数  : uchar8 col       显示的横坐标0~122
@@ -136,7 +135,7 @@ void OLED_P6x8Char(uchar8 col, uchar8 row, uchar8 data)
              uchar8 str[]  显示的字符串
  输出参数  : NONE
  返 回 值  : NONE
-*****************************************************************************/
+*************************************************************/
 void OLED_P6x8Str(uchar8 col, uchar8 row, uchar8 str[])
 {
     uchar8 i;
@@ -171,6 +170,8 @@ void OLED_P8x16Char(uchar8 col, uchar8 row, uchar8 data)
     /* valid character starts from ' '(32) in ASCII */
     font_inx = data - ' ';
 
+    pthread_mutex_lock( &oled_lock );
+
     OLED_SetPos(col, row);
     for(i = 0; i < col_per_char; i++)
         OLED_WrDat(Font_8x16[font_inx << 4 + i]);
@@ -178,6 +179,8 @@ void OLED_P8x16Char(uchar8 col, uchar8 row, uchar8 data)
     OLED_SetPos(col, ++row);
     for(i = 0; i < col_per_char; i++)
         OLED_WrDat(Font_8x16[font_inx << 4 + i + 8]);
+
+    pthread_mutex_unlock( &oled_lock );
 }
 
 /*************************************************************
