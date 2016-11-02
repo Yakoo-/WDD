@@ -77,12 +77,50 @@ void print_line(int line)
     OLED_P6x8Str(5 * 6, 0, line_str);
 }
 
-void clear_line(void)
+inline void clear_line(void)
 {
-    char line_str[20] = "           ";
-    OLED_P6x8Str(5 * 6, 0, line_str);
+    OLED_P6x8Str(5 * 6, 0, "           ");
 }
 
+#define PRO_BAR_BLANK_INX   0
+#define PRO_BAR_HEAD_INX    1 
+#define PRO_BAR_FULL_INX    2 
+#define PRO_BAR_HOLE_INX    3
+#define PRO_BAR_FRONT_LEN   1
+#define PRO_BAR_END_LEN     1
+#define PRO_BAR_MAX_COLS    60
+#define PRO_BAR_START_COL   (6 * 6) // 6 cols per char, start from the 6th character
+
+void show_progress_bar(int level, int level_sum)
+{
+    /*                        blank head  full  hole */
+    static const bar_image[] = { 0, 0x1c, 0x7f, 0x41 };
+    char bar_len = PRO_BAR_MAX_COLS - PRO_BAR_MAX_COLS % level_sum;
+    char cols_per_level = bar_len / level_sum;
+    int i = 0;
+
+    /* initial */
+    if (0 == level) {
+        for ( i = 0; i < PRO_BAR_FRONT_LEN; i++)
+            OLED_WrBits(PRO_BAR_START_COL + i, 0, bar_image[PRO_BAR_FULL_INX]);
+
+        for ( i = 0; i < bar_len; i++ )
+            OLED_WrBits(PRO_BAR_START_COL + PRO_BAR_FRONT_LEN + i , 0, bar_image[PRO_BAR_HOLE_INX]);
+
+        for ( i = 0; i < PRO_BAR_END_LEN; i++)
+            OLED_WrBits(PRO_BAR_START_COL + PRO_BAR_FRONT_LEN + bar_len + i, 0, bar_image[PRO_BAR_FULL_INX]);
+    }
+    else
+        for ( i = 0; i < cols_per_level; i++)
+            OLED_WrBits(PRO_BAR_START_COL + PRO_BAR_FRONT_LEN + (level - 1) * cols_per_level + i,
+                        0,
+                        bar_image[PRO_BAR_FULL_INX]);
+}
+
+inline void clear_progress_bar(void)
+{
+    OLED_P6x8Str(PRO_BAR_START_COL, 0, "           ");
+}
 
 void print_ccd_data(unsigned int * pixels)
 {
@@ -484,6 +522,8 @@ int main (int argc, char ** argv)
             pthread_cond_wait( &repeate_cond, &repeate_lock );
 
         clear_line();
+        show_progress_bar(0, repeate);
+
         unsigned int line_tmp = 0;
         for (i = 0; i < repeate; i++){
 
@@ -495,8 +535,11 @@ int main (int argc, char ** argv)
 
             /* fresh ccd data on oled screen */
             print_ccd_data(pixels);
+            show_progress_bar(i + 1, repeate);
             usleep(300000);
         }
+
+        clear_progress_bar();
         print_line(line_tmp / repeate);
 
         repeate = 0;

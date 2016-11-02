@@ -8,11 +8,11 @@
 #define BAT_IMG_HEAD_INX    1 
 #define BAT_IMG_FULL_INX    2 
 #define BAT_IMG_VOL_INX     3
-/*                        blank head  full  vol */
-static const vol_image[] = { 0, 0x1c, 0x7f, 0x41 };
 
 void fresh_battery(void)
 {
+    /*                        blank head  full  vol */
+    static const vol_image[] = { 0, 0x1c, 0x7f, 0x41 };
     int i = 0, col = 0;
     char bits; 
 
