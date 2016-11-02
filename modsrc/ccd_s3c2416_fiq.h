@@ -56,3 +56,8 @@
 #define reg_index       __REG_NR(12)
 #define reg_datain      __REG_NR(13)
 
+
+/* CCD commands */
+#define CCD_IOC_MAGIC      'y'
+#define CCD_CMD_SET_BRIGHT  _IOW(CCD_IOC_MAGIC, 0, int)
+#define CCD_IOC_MAXNR       1

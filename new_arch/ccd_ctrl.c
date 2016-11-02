@@ -10,20 +10,19 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+#include "ccd.h"
 #include "ccd_ctrl.h"
 #include "adc_ctrl.h"
 #include "oled_ctrl.h"
 
-#include "main.h"
 #include "fftw3.h"
 
 #include "thread_button.h"
 #include "thread_battery.h"
 
-pthread_mutex_t repeate_lock;
-pthread_cond_t  repeate_cond;
-unsigned int repeate; 
-
+#define STATUS_START_CHAR   5
+#define COLS_PER_CHAR       6
+#define STATUS_START_COL    (STATUS_START_CHAR * COLS_PER_CHAR)
 
 #define ONCE 1
 #define NONE 0
@@ -74,12 +73,7 @@ void print_line(int line)
     strcat(line_str, num_str);
 
     /* hard code, TBD */
-    OLED_P6x8Str(5 * 6, 0, line_str);
-}
-
-inline void clear_line(void)
-{
-    OLED_P6x8Str(5 * 6, 0, "           ");
+    OLED_P6x8Str(STATUS_START_COL, 0, line_str);
 }
 
 #define PRO_BAR_BLANK_INX   0
@@ -89,7 +83,7 @@ inline void clear_line(void)
 #define PRO_BAR_FRONT_LEN   1
 #define PRO_BAR_END_LEN     1
 #define PRO_BAR_MAX_COLS    60
-#define PRO_BAR_START_COL   (6 * 6) // 6 cols per char, start from the 6th character
+#define PRO_BAR_START_COL   (STATUS_START_COL + COLS_PER_CHAR) // 6 cols per char, start from the 6th character
 
 void show_progress_bar(int level, int level_sum)
 {
@@ -117,9 +111,9 @@ void show_progress_bar(int level, int level_sum)
                         bar_image[PRO_BAR_FULL_INX]);
 }
 
-inline void clear_progress_bar(void)
+inline void clear_staus_bar(void)
 {
-    OLED_P6x8Str(PRO_BAR_START_COL, 0, "           ");
+    OLED_P6x8Str(STATUS_START_COL, 0, "              ");
 }
 
 void print_ccd_data(unsigned int * pixels)
@@ -144,7 +138,7 @@ void print_ccd_data(unsigned int * pixels)
         aop = aop / pns / CCD_COMPRESS_RATE;    
         threshold_row = OLED_ROW_NUM - (aop / OLED_ROW_NUM) - 1;
 
-        for (row = 0; row < threshold_row; row++)
+        for (row = 0 + OLED_TOP_MASK; row < threshold_row; row++)
             OLED_WrBits(col, row + CCD_BOTTOM_MASK, 0);
 
         OLED_WrBits(col, threshold_row + CCD_BOTTOM_MASK, ( 0xff00 >> (aop % OLED_ROW_NUM) ) & 0xff);
@@ -483,11 +477,27 @@ void count(unsigned char c[N])
     line=k/2;
 }
 
+void set_brightness(int fd_ccd, unsigned char brightness)
+{
+    char bright_str[20] = "brightness: ";
+    char num_str[20] = {0};
+
+    ioctl(fd_ccd, CCD_CMD_SET_BRIGHT, 0x3 & brightness);
+
+    sprintf(num_str, "%d", 0x3 & brightness);
+    strcat(bright_str, num_str);
+
+    OLED_P6x8Str(STATUS_START_COL, 0, bright_str);
+}
+
 int main (int argc, char ** argv)
 {
     int fd_ccd = -1, i = 0, ret = 0, vol_lev = 0;
     unsigned int pixels[CCD_MAX_PIXEL_CNT];
     const unsigned int buffer_len = sizeof(pixels);
+    unsigned int release_wake = 1;  // wake when button release
+    unsigned char brightness = 3;    // 0, lights off; 1, 4 leds; 2, 8 leds; 3, 12 leds;
+    unsigned int repeate = 1; 
     pthread_t ppid_button;
     pthread_t ppid_voltage;
 
@@ -499,12 +509,12 @@ int main (int argc, char ** argv)
             repeate = atoi(argv[1]);
 
     pthread_mutex_init(&oled_lock, NULL);  
-    pthread_mutex_init(&repeate_lock, NULL);  
+    pthread_mutex_init(&button_lock, NULL);  
 
     /* hard code, TBD */
     OLED_P6x8Str(0, 0, " WDD ");
 
-    ret = pthread_create(&ppid_button, NULL, (void *)select_button, NULL);
+    ret = pthread_create(&ppid_button, NULL, (void *)select_button, (void *)&release_wake);
     if (ret != 0)
         Error("Failed to create button select thread!");
 
@@ -517,12 +527,34 @@ int main (int argc, char ** argv)
         Error("Failed to open device: " CCD_DEV_NAME "!\n");
 
     while (1){
-        pthread_mutex_lock( &repeate_lock );
-        while (repeate == 0)
-            pthread_cond_wait( &repeate_cond, &repeate_lock );
+        pthread_mutex_lock( &button_lock );
+        while (0 == key_num)
+            pthread_cond_wait( &button_cond, &button_lock );
 
-        clear_line();
-        show_progress_bar(0, repeate);
+        clear_staus_bar();
+
+        switch(key_num){
+        case 1:
+            repeate = 1;
+            show_progress_bar(0, repeate);
+            break;
+        case 2:
+            repeate = 10;
+            show_progress_bar(0, repeate);
+            break;
+        case 3:
+            repeate = 0;
+            if (brightness < 3)
+                brightness++;
+            else
+                brightness = 1;
+            set_brightness(fd_ccd, brightness);
+            break;
+        default:
+            repeate = 0;
+            break;
+        }
+
 
         unsigned int line_tmp = 0;
         for (i = 0; i < repeate; i++){
@@ -536,14 +568,17 @@ int main (int argc, char ** argv)
             /* fresh ccd data on oled screen */
             print_ccd_data(pixels);
             show_progress_bar(i + 1, repeate);
+
             usleep(300000);
         }
 
-        clear_progress_bar();
-        print_line(line_tmp / repeate);
+        if (repeate){
+            clear_staus_bar();
+            print_line(line_tmp / repeate);
+        }
 
-        repeate = 0;
-        pthread_mutex_unlock( &repeate_lock );
+        key_num = 0;
+        pthread_mutex_unlock( &button_lock );
     }
     return 0;
 }

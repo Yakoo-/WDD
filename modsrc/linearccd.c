@@ -14,6 +14,11 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 
+#include <mach/map.h>
+#include <mach/regs-irq.h>
+#include <mach/regs-gpio.h>
+#include <mach/irqs.h>
+
 #include <asm/uaccess.h>
 #include <asm/fiq.h>
 #include <asm/irq.h>
@@ -70,6 +75,7 @@ static struct fiq_args *fiq_arg;
 static struct class *ccd_class;
 static struct device *ccd_dev;
 static unsigned int major;
+static unsigned int brightness = 1;
 
 static struct fiq_handler ccd_s3c2416_fiq_fh = {
     .name   = "ccd_s3c2416_fiq_handler"
@@ -133,8 +139,23 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     int ret;
     struct pt_regs regs;
 
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 1);
-    /* s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 1); */
+    switch (brightness){
+    case 0:
+        break;
+    case 1:
+        s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 1);
+        break;
+    case 2:
+        s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 1);
+        break;
+    case 3:
+        s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 1);
+        s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 1);
+        break;
+    default:
+        s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 1);
+        break;
+    }
 
     /* Signal charge integration time is positive associate to */
     /* the High-to-Low ratio of START pulses. */
@@ -155,9 +176,9 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     msleep(13);
 
     /* reset pins value */
-    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 0);
-    /* s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 0); */
     s3c2410_gpio_setpin(ccd_gpio[INDEX_START ].pin, 1);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT1].pin, 0);
+    s3c2410_gpio_setpin(ccd_gpio[INDEX_LEDCT2].pin, 0);
 
     get_fiq_regs(&regs);
 
@@ -180,11 +201,25 @@ static int ccd_read(struct file *file, char __user *buff, size_t count, loff_t *
     return ret ? -EFAULT : CCD_BUFFER_SIZE;
 }
 
+static long ccd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+    switch (cmd){
+    case CCD_CMD_SET_BRIGHT:
+        brightness = 0x3 & arg;
+        break;
+    default:
+        return -EINVAL;
+        break;
+    }
+    return 0;
+}
+
 static struct file_operations ccd_fops = {
     .owner  = THIS_MODULE,
     .open   = ccd_open,
     .release= ccd_close,
     .read   = ccd_read,
+    .unlocked_ioctl = ccd_ioctl,
 };
 
 static int __init ccd_init(void)

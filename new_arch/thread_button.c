@@ -11,14 +11,18 @@
 #include <pthread.h>
 
 #include "common.h"
-#include "main.h"
 #include "thread_button.h"
 
 static int fd_button = -1;
+pthread_mutex_t button_lock;
+pthread_cond_t  button_cond;
+unsigned int key_num;
 
-void select_button(void)
+/* input : release_wake  trigger condition; = 0, press trigger; = 1, release trigger */
+void select_button(void *release_wakep)
 {
     int key_value[4], ret, i;
+    int release_wake = *(int *)release_wakep;
     fd_set rds;
 
     if( -1 == fd_button ){
@@ -44,38 +48,29 @@ void select_button(void)
         if (ret == 0) {
             printf("Timeout.\n");
         } 
-        else 
-            if(FD_ISSET(fd_button, &rds)) {
+        else if(FD_ISSET(fd_button, &rds)) {
             int ret=read(fd_button, key_value, sizeof(key_value));
+
             if (ret != sizeof(key_value)) {
                 if (errno != EAGAIN)
                     perror("read device button\n");
                continue;
             }
 
-            pthread_mutex_lock( &repeate_lock );
-            if (0 == repeate)
-                pthread_cond_signal( &repeate_cond );
+            pthread_mutex_lock( &button_lock );
 
-            for (i = 0;i < 4;i++){
-                switch (key_value[i]) {
-                case 0x81:
-                    repeate = 1;
-                    break;
-                case 0x82:
-                    repeate = 10;
-                    break;
-                case 0x83:
-                    repeate = 20;
-                    break;
-                case 0x84:
-                    break;
-                default:
-                    break;
-                }
+            for (i = 0; i < 4; i++){
+                if (  key_value[i] &&   
+                    ( release_wake &&  (key_value[i] & 0xf0)) ||
+                    (!release_wake && !(key_value[i] & 0xf0))
+                    ){
+                        key_num = i + 1;
+                        pthread_cond_signal( &button_cond );
+                        break;
+                    }
             }
 
-            pthread_mutex_unlock( &repeate_lock );
+            pthread_mutex_unlock( &button_lock );
         }
     }
 }

@@ -14,7 +14,7 @@
 
 #include "common.h"
 
-#define DEVICE_NAME	"button"
+#define DEVICE_NAME	    "button"
 #define BUTTON_MAJOR	232
 
 struct button_irq_desc
